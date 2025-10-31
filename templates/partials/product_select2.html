@@ -1,0 +1,16 @@
+<label class="block text-sm font-medium text-gray-700 mb-1" id="product2-label">{{ label }}</label>
+<select
+    name="product2"
+    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+    hx-post="/api/update"
+    hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
+    hx-target="#dashboard-content"
+    hx-trigger="change"
+    hx-indicator=".htmx-indicator"
+    hx-swap="innerHTML"
+>
+    <option value="">Select {{ label|lower }}...</option>
+    {% for option in options %}
+    <option value="{{ option }}">{{ option }}</option>
+    {% endfor %}
+</select>

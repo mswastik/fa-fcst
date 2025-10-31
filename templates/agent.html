@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="agent-container" x-data="agentData()" class="w-full">
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">Medical Device Market Research Agent</h2>
+        
+        <!-- Input Section -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Product</label>
+                <input 
+                    type="text" 
+                    id="product-input"
+                    x-model="product"
+                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                    placeholder="Enter product (e.g. Medical Device)"
+                />
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Region</label>
+                <select 
+                    id="region-input"
+                    x-model="region"
+                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                >
+                    <option value="">Select region...</option>
+                    <option value="All Regions">All Regions</option>
+                    <template x-for="region in regions" :key="region">
+                        <option x-text="region" :value="region"></option>
+                    </template>
+                </select>
+            </div>
+            
+            <div class="flex items-end">
+                <button 
+                    @click="runAgent"
+                    :disabled="isSearching"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md disabled:opacity-50"
+                    x-text="isSearching ? 'Searching...' : 'Run Agent'"
+                ></button>
+            </div>
+        </div>
+        
+        <!-- Results Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left Side: Table -->
+            <div class="lg:col-span-1">
+                <div class="bg-gray-50 rounded-lg shadow p-4">
+                    <h3 class="text-lg font-semibold mb-3">Business Unit & Country Data</h3>
+                    <div class="overflow-y-auto max-h-96">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Business Unit</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Country</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Year YoY</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <template x-for="row in tableData" :key="row.row_id">
+                                    <tr 
+                                        class="hover:bg-gray-50 cursor-pointer" 
+                                        :class="{'bg-blue-100': selectedRow && selectedRow.row_id === row.row_id}"
+                                        @click="selectRow(row)"
+                                    >
+                                        <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900" x-text="row.business_unit"></td>
+                                        <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900" x-text="row.country"></td>
+                                        <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900" x-text="row.last_year_yoy ? row.last_year_yoy + '%' : 'N/A'"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Side: Output -->
+            <div class="lg:col-span-2">
+                <div class="bg-gray-50 rounded-lg shadow p-4 h-full flex flex-col">
+                    <h3 class="text-lg font-semibold mb-3">Agent Output</h3>
+                    <div 
+                        id="output-area" 
+                        class="bg-white rounded border p-4 flex-grow overflow-y-auto mb-3 min-h-96"
+                        x-html="outputHtml"
+                    ></div>
+                    
+                    <!-- Search Configuration Panel -->
+                    <div 
+                        x-show="showConfig" 
+                        class="bg-blue-50 rounded-lg p-4 mt-3 transition-all duration-300"
+                    >
+                        <h4 class="font-medium mb-2">Agent Configuration</h4>
+                        
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Search Query 1</label>
+                            <textarea 
+                                x-model="searchQuery1" 
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border h-16"
+                                placeholder="Template for first search query"
+                            ></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Search Query 2</label>
+                            <textarea 
+                                x-model="searchQuery2" 
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border h-16"
+                                placeholder="Template for second search query"
+                            ></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Agent Role</label>
+                            <select x-model="role" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border">
+                                <option value="Demand Planner">Demand Planner</option>
+                                <option value="Market Analyst">Market Analyst</option>
+                                <option value="Business Development Manager">Business Development Manager</option>
+                                <option value="Devil's Advocate">Devil's Advocate</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Objective</label>
+                            <textarea 
+                                x-model="objective" 
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border h-24"
+                                placeholder="Agent objective"
+                            ></textarea>
+                        </div>
+                        
+                        <button 
+                            @click="resetConfig"
+                            class="text-sm text-blue-600 hover:text-blue-800"
+                        >
+                            Reset to Defaults
+                        </button>
+                    </div>
+                    
+                    <button 
+                        @click="showConfig = !showConfig"
+                        class="self-start text-sm text-gray-600 hover:text-gray-800 mt-2"
+                    >
+                        <span x-text="showConfig ? 'Hide Config' : 'Show Config'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function agentData() {
+        return {
+            product: '',
+            region: '',
+            regions: [],
+            tableData: [],
+            selectedRow: null,
+            outputHtml: '',
+            isSearching: false,
+            showConfig: false,
+            
+            // Configuration
+            searchQuery1: '{product} medical device category market growth potential for next 5 years in {region}',
+            searchQuery2: '{product} medical device category competitors of Stryker in {region}',
+            role: 'Demand Planner',
+            objective: 'help demand planners generate long term forecasts by providing insights on market dynamics that can impact demand of Stryker {product} medical device in {region} in coming years both positively and negatively. Based on the given context, give your opinion whether the Stryker\'s forecast should be updated or not.',
+            
+            init() {
+                this.loadRegions();
+                this.loadTableData();
+            },
+            
+            async loadRegions() {
+                try {
+                    const response = await fetch('/api/regions');
+                    const data = await response.json();
+                    // Extract unique countries from the response
+                    this.regions = data.countries || [];
+                } catch (error) {
+                    console.error('Error loading regions:', error);
+                }
+            },
+            
+            async loadTableData() {
+                try {
+                    const response = await fetch('/api/agent-table-data');
+                    const data = await response.json();
+                    this.tableData = data.rows || [];
+                } catch (error) {
+                    console.error('Error loading table data:', error);
+                }
+            },
+            
+            selectRow(row) {
+                this.selectedRow = row;
+                this.product = row.business_unit;
+                this.region = row.country;
+            },
+            
+            async runAgent() {
+                if (!this.product || !this.region) {
+                    alert('Please enter both product and region');
+                    return;
+                }
+                
+                this.isSearching = true;
+                this.outputHtml = '<div class="flex justify-center items-center"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div><span class="ml-2">Running agent...</span></div>';
+                
+                try {
+                    const response = await fetch('/api/agent', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            product: this.product,
+                            region: this.region,
+                            search_query1: this.searchQuery1,
+                            search_query2: this.searchQuery2,
+                            role: this.role,
+                            objective: this.objective
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.outputHtml = data.result;
+                    } else {
+                        this.outputHtml = `<div class="text-red-600">Error: ${data.error || 'Unknown error'}</div>`;
+                    }
+                } catch (error) {
+                    this.outputHtml = `<div class="text-red-600">Error: ${error.message}</div>`;
+                } finally {
+                    this.isSearching = false;
+                }
+            },
+            
+            resetConfig() {
+                this.searchQuery1 = '{product} medical device category market growth potential for next 5 years in {region}';
+                this.searchQuery2 = '{product} medical device category competitors of Stryker in {region}';
+                this.role = 'Demand Planner';
+                this.objective = 'help demand planners generate long term forecasts by providing insights on market dynamics that can impact demand of Stryker {product} medical device in {region} in coming years both positively and negatively. Based on the given context, give your opinion whether the Stryker\'s forecast should be updated or not.';
+            }
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,2095 @@
+<body>
+    <div class="container">
+        <div class="main-content">
+            <div class="sidebar" id="sidebar-left">
+                <button class="sidebar-toggle-button" onclick="toggleSidebar('sidebar-left')"><span class="toggle-icon"><<</span></button>
+                <div class="field-group">
+                    <h4>Rows</h4>
+                    <select class="field-list field-select" data-zone="rows" id="row-fields" multiple></select>
+                </div>
+                <div class="field-group">
+                    <h4>Columns</h4>
+                    <select class="field-list field-select" data-zone="columns" id="column-fields" multiple></select>
+                </div>
+        
+                <div class="field-group">
+                    <h4>Values</h4>
+                    <select class="field-list field-select" data-zone="values" id="value-fields" multiple></select>
+                </div>
+                <div class="field-group">
+                    <h4>Facet By</h4>
+                    <select class="field-list" id="facet-field">
+                        <option value="">None</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <h4>Filters</h4>
+                    <div class="filter-controls">
+                        <select id="filter-field" class="filter-select"><div></div></select>
+                      <div style="display:grid;grid-template-columns: 1fr 1fr;gap: 4px;">
+                        <!-- <button class="btn small" onclick="applyFilter()">Apply Filter</button>
+                        <button class="btn small danger" onclick="clearFilters()">Clear Filters</button> -->
+                      </div>
+                    </div>
+                    <div id="active-filters" class="active-filters"></div>
+                </div>
+            </div>
+            <div class="sidebar" id="sidebar-right">
+                <button class="sidebar-toggle-button" onclick="toggleSidebar('sidebar-right')"><span class="toggle-icon"><<</span></button>
+            <div class="field-group" style="max-width: 100%;">
+                <h4>Catalog Numbers</h4>
+                <a href="#" id="reset-catalog-filter" style="font-size: 1em; font-weight: 500; display: block; margin-bottom: 10px; margin-left:auto;">Reset Filter</a>
+            <div class="catalog-number-table" style="min-width: 94%; max-width: 94%;">
+                <div id="catalog-number-list">
+                    <!-- Catalog numbers will be listed here -->
+                </div></div>
+            </div></div>
+
+            <div class="content-area">
+                <div class="view-tabs">
+                    <button class="tab" onclick="switchTab('table')">Table View</button>
+                    <button class="tab active" onclick="switchTab('chart')">Charts</button>
+                    <button class="tab" onclick="switchTab('metrics')">Key Metrics</button>
+                    <button class="tab" onclick="switchTab('forecast')">Forecasts</button>
+                    <button class="tab" onclick="switchTab('validation')">Model Validation</button>
+                    <button class="tab" onclick="switchTab('raw')">Raw Data</button>
+                </div>
+
+                <div id="table-view" class="tab-content">
+                    <div id="pivot-output">
+                        <div class="empty-state">
+                            <h3>No Pivot Table Generated</h3>
+                            <p>Drag fields to the Rows, Columns, or Values sections and click "Generate Analysis" to start analyzing your data.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="chart-view" class="tab-content active">
+                    <div class="chart-controls">
+                        <select class="chart-select" id="chart-type" onchange="updateChart()">
+                            <option value="line">Line Chart</option>      
+                            <option value="bar">Bar Chart</option>
+                            <option value="pie">Pie Chart</option>
+                            <option value="doughnut">Doughnut Chart</option>
+                            <option value="radar">Radar Chart</option>
+                            <option value="polarArea">Polar Area</option>
+                        </select>
+                    </div>
+                    <div class="chart-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div>
+                            <label for="chart-limit">Max Charts: </label>
+                            <input type="number" id="chart-limit" min="1" max="50" value="10" style="width: 60px;">
+                        </div>
+                        <button class="btn small" onclick="updateChart()">Update Charts</button>
+                    </div>
+                    <div id="chart-container" class="chart-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 10px;">
+                        <canvas id="pivotChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+
+                <div id="metrics-view" class="tab-content" style="width:100%">
+                    <div id="metrics-grid" class="grid-view">
+                        <div class="empty-state">
+                            <h3>No Metrics Available</h3>
+                            <p>Generate a pivot table first to see key metrics.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="forecast-view" class="tab-content">
+                    <div class="forecast-controls" style="margin-bottom: 20px;">
+                        <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;">
+                            <div>
+                                <label for="forecast-horizon" style="font-weight: 500;">Forecast Horizon: </label>
+                                <select id="forecast-horizon" style="padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px;">
+                                    <option value="3">3 Months</option>
+                                    <option value="6">6 Months</option>
+                                    <option value="12">12 Months</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="forecast-cycle" style="font-weight: 500;">Forecast Cycle: </label>
+                                <select id="forecast-cycle" style="padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px;">
+                                    <option value="latest">Latest</option>
+                                    <option value="previous">Previous Month</option>
+                                    <option value="2months">2 Months Ago</option>
+                                </select>
+                            </div>
+                            <button class="btn" onclick="loadForecastData()" style="background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px;">Load Forecasts</button>
+                            <button class="btn secondary" onclick="exportForecastData()">Export Forecasts</button>
+                        </div>
+                    </div>
+
+                    <div class="forecast-content">
+                        <div id="forecast-summary" class="forecast-summary" style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px;">
+                            <h4 style="margin: 0 0 10px 0;">Forecast Summary</h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                                <div><strong>Total Forecasts:</strong> <span id="total-forecasts">-</span></div>
+                                <div><strong>Approved:</strong> <span id="approved-forecasts">-</span></div>
+                                <div><strong>Current Cycle:</strong> <span id="current-cycle">-</span></div>
+                                <div><strong>Avg Forecast Value:</strong> <span id="avg-forecast-value">-</span></div>
+                            </div>
+                        </div>
+
+                        <div id="forecast-table-container" style="overflow-x: auto;">
+                            <table id="forecast-table" style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background-color: #f8f9fa;">
+                                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Item</th>
+                                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Location</th>
+                                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Forecast Date</th>
+                                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Horizon</th>
+                                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Model</th>
+                                        <th style="padding: 8px; border: 1px solid #ddd; text-align: right;">Forecast Value</th>
+                                        <th style="padding: 8px; border: 1px solid #ddd; text-align: right;">Lower Bound</th>
+                                        <th style="padding: 8px; border: 1px solid #ddd; text-align: right;">Upper Bound</th>
+                                        <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="forecast-table-body">
+                                    <tr>
+                                        <td colspan="9" style="text-align: center; padding: 40px; color: #666;">
+                                            Click "Load Forecasts" to display forecast data
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="validation-view" class="tab-content">
+                    <div class="validation-controls" style="margin-bottom: 20px;">
+                        <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;">
+                            <div>
+                                <label for="validation-period" style="font-weight: 500;">Validation Period: </label>
+                                <select id="validation-period" style="padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px;">
+                                    <option value="3">Last 3 Months</option>
+                                    <option value="6">Last 6 Months</option>
+                                    <option value="12">Last 12 Months</option>
+                                </select>
+                            </div>
+                            <button class="btn" onclick="runModelValidation()" style="background-color: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px;">Run Validation</button>
+                            <button class="btn secondary" onclick="exportValidationReport()">Export Report</button>
+                        </div>
+                    </div>
+
+                    <div class="validation-content">
+                        <div id="validation-summary" class="validation-summary" style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px;">
+                            <h4 style="margin: 0 0 10px 0;">Model Performance Summary</h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                                <div><strong>Best Model:</strong> <span id="best-model">-</span></div>
+                                <div><strong>Avg MAPE:</strong> <span id="avg-mape">-</span></div>
+                                <div><strong>Avg RMSE:</strong> <span id="avg-rmse">-</span></div>
+                                <div><strong>Accuracy %:</strong> <span id="overall-accuracy">-</span></div>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div id="validation-table-container" style="overflow-x: auto;">
+                                <h4>Model Performance Metrics</h4>
+                                <table id="validation-table" style="width: 100%; border-collapse: collapse;">
+                                    <thead>
+                                        <tr style="background-color: #f8f9fa;">
+                                            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Model</th>
+                                            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Period</th>
+                                            <th style="padding: 8px; border: 1px solid #ddd; text-align: right;">MAE</th>
+                                            <th style="padding: 8px; border: 1px solid #ddd; text-align: right;">MAPE</th>
+                                            <th style="padding: 8px; border: 1px solid #ddd; text-align: right;">RMSE</th>
+                                            <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Accuracy %</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="validation-table-body">
+                                        <tr>
+                                            <td colspan="6" style="text-align: center; padding: 40px; color: #666;">
+                                                Click "Run Validation" to analyze model performance
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div id="validation-chart-container">
+                                <h4>Model Comparison Chart</h4>
+                                <div style="height: 300px; position: relative;">
+                                    <canvas id="validationChart" width="400" height="300"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="raw-view" class="tab-content">
+                    <div class="controls" style="text-align: right; margin-bottom: 10px;">
+                        <button class="btn secondary" onclick="exportRawData()">Export Raw Data</button>
+                    </div>
+                    <div class="pivot-table">
+                        <div id="raw-data-output">
+                            <div class="empty-state">
+                                <h3>No Data Loaded</h3>
+                                <p>Load data to view raw data table.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+function toggleSidebar(sidebarId) {
+    const sidebar = document.getElementById(sidebarId);
+    const mainContent = document.querySelector('.main-content');
+    const button = sidebar.querySelector('.sidebar-toggle-button');
+    
+    // Toggle visibility class
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    sidebar.classList.toggle('collapsed', !isCollapsed);
+    
+    // Maintain original grid template if already set
+    if (!mainContent.style.gridTemplateColumns) {
+        mainContent.style.gridTemplateColumns = '200px 200px 1fr';
+    }
+    
+    let columns = mainContent.style.gridTemplateColumns.split(' ');
+    
+    // Ensure correct column structure
+    if (columns.length !== 3) {
+        columns = ['200px', '200px', '1fr'];
+    }
+    
+    // Adjust only the relevant sidebar width
+    if (sidebarId === 'sidebar-left') {
+        columns[0] = isCollapsed ? '200px' : '50px';
+    } else if (sidebarId === 'sidebar-right') {
+        columns[1] = isCollapsed ? '200px' : '50px';
+    }
+    
+    mainContent.style.gridTemplateColumns = columns.join(' ');
+    
+    // Update button icon
+    const icon = button.querySelector('.toggle-icon');
+    if (icon) {
+        icon.classList.toggle('closed', !isCollapsed);
+        // Both sidebars are on left, so use same icon direction
+        icon.textContent = isCollapsed ? '<<' : '>>';
+    }
+}
+
+    function convertMultiSelectToAutocomplete() {
+        // Find all select elements with multiple attribute
+        const multiSelects = document.querySelectorAll('select[multiple]');
+        
+        multiSelects.forEach(select => {
+            // Remove existing custom multiselect if it was already converted
+            const existingCustomContainer = select.nextElementSibling;
+            if (existingCustomContainer && existingCustomContainer.classList.contains('custom-multiselect')) {
+                existingCustomContainer.remove();
+            }
+            
+            // Get original options
+            const options = Array.from(select.options).map(opt => ({
+                value: opt.value,
+                text: opt.textContent,
+                selected: opt.selected
+            }));
+            
+            // Create custom multiselect container
+            const container = document.createElement('div');
+            container.className = 'custom-multiselect';
+            container.style.position = 'relative';
+            container.style.width = '100%';
+            container.style.display = 'block';
+            
+            const multiselectContainer = document.createElement('div');
+            multiselectContainer.className = 'multiselect-container';
+            multiselectContainer.tabIndex = 0;
+            multiselectContainer.style.border = '1px solid #ccc';
+            multiselectContainer.style.borderRadius = '4px';
+            multiselectContainer.style.padding = '5px';
+            multiselectContainer.style.minHeight = '30px';
+            multiselectContainer.style.display = 'flex';
+            multiselectContainer.style.flexWrap = 'wrap';
+            multiselectContainer.style.alignItems = 'center';
+            multiselectContainer.style.gap = '4px';
+            multiselectContainer.style.backgroundColor = 'white';
+            
+            const selectedItems = document.createElement('div');
+            selectedItems.className = 'selected-items';
+            selectedItems.style.display = 'flex';
+            selectedItems.style.flexWrap = 'wrap';
+            selectedItems.style.gap = '4px';
+            selectedItems.style.flexGrow = '1';
+            
+            const searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.className = 'search-input';
+            searchInput.placeholder = 'Type to search...';
+            searchInput.style.border = 'none';
+            searchInput.style.outline = 'none';
+            searchInput.style.flexGrow = '1';
+            searchInput.style.minWidth = '50px';
+            
+            const arrow = document.createElement('div');
+            arrow.className = 'dropdown-arrow';
+            arrow.style.cursor = 'pointer';
+            
+            const dropdown = document.createElement('div');
+            dropdown.className = 'options-dropdown';
+            dropdown.style.position = 'absolute';
+            dropdown.style.top = '100%';
+            dropdown.style.left = '0';
+            dropdown.style.width = '100%';
+            dropdown.style.maxHeight = '200px';
+            dropdown.style.overflowY = 'auto';
+            dropdown.style.backgroundColor = 'white';
+            dropdown.style.border = '1px solid #ccc';
+            dropdown.style.borderRadius = '4px';
+            dropdown.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+            dropdown.style.zIndex = '1000';
+            dropdown.style.display = 'none';
+            
+            // Assemble structure
+            selectedItems.appendChild(searchInput);
+            multiselectContainer.appendChild(selectedItems);
+            multiselectContainer.appendChild(arrow);
+            container.appendChild(multiselectContainer);
+            container.appendChild(dropdown);
+            
+            // Insert after original select and hide original
+            select.parentNode.insertBefore(container, select.nextSibling);
+            select.style.display = 'none';
+            
+            let selectedValues = new Set();
+            let isOpen = false;
+            
+            function updateSelectedDisplay() {
+                // Update selectedValues from the actual select element
+                selectedValues = new Set(Array.from(select.selectedOptions).map(opt => opt.value));
+                
+                // Clear current display except search input
+                const tags = selectedItems.querySelectorAll('.selected-tag');
+                tags.forEach(tag => tag.remove());
+                
+                // Add selected items as tags
+                selectedValues.forEach(value => {
+                    const option = options.find(opt => opt.value === value);
+                    if (option) {
+                        const tag = document.createElement('div');
+                        tag.className = 'selected-tag';
+                        tag.innerHTML = `
+                            ${option.text}
+                            <span class="tag-remove" data-value="${option.value}">x</span>
+                        `;
+                        selectedItems.insertBefore(tag, searchInput);
+                    }
+                });
+                
+                // Show placeholder if no selections
+                if (selectedValues.size === 0) {
+                    searchInput.placeholder = 'Type to search...';
+                } else {
+                    searchInput.placeholder = '';
+                }
+                
+                // **CRITICAL FIX**: Trigger pivot generation after selection changes
+                generatePivot();
+            }
+
+            function filterOptions(searchTerm = '') {
+                dropdown.innerHTML = '';
+                
+                const filteredOptions = options.filter(opt =>
+                    opt.text.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+                
+                if (filteredOptions.length === 0) {
+                    const noOptions = document.createElement('div');
+                    noOptions.className = 'no-options';
+                    noOptions.textContent = 'No options found';
+                    dropdown.appendChild(noOptions);
+                    return;
+                }
+                
+                filteredOptions.forEach(option => {
+                    const item = document.createElement('div');
+                    item.className = 'option-item';
+                    if (selectedValues.has(option.value)) {
+                        item.classList.add('selected');
+                    }
+                    
+                    item.innerHTML = `
+                        <input type="checkbox" class="option-checkbox" ${selectedValues.has(option.value) ? 'checked' : ''}>
+                        <span>${option.text}</span>
+                    `;
+                    
+                    item.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const checkbox = item.querySelector('.option-checkbox');
+                        
+                        if (selectedValues.has(option.value)) {
+                            selectedValues.delete(option.value);
+                            checkbox.checked = false;
+                            item.classList.remove('selected');
+                        } else {
+                            selectedValues.add(option.value);
+                            checkbox.checked = true;
+                            item.classList.add('selected');
+                        }
+                        
+                        // Update the original select element
+                        Array.from(select.options).forEach(opt => {
+                            opt.selected = selectedValues.has(opt.value);
+                        });
+                        
+                        updateSelectedDisplay();
+                        applyFilter(); // Apply filter on selection change
+                    });
+                    
+                    dropdown.appendChild(item);
+                });
+            }
+            
+            // Attach functions to the original select element for external access
+            select._updateCustomDisplay = updateSelectedDisplay;
+            select._filterOptions = filterOptions;
+
+            function openDropdown() {
+                if (!isOpen) {
+                    isOpen = true;
+                    dropdown.style.display = 'block';
+                    arrow.classList.add('open');
+                    filterOptions(searchInput.value);
+                    searchInput.focus();
+                }
+            }
+            
+            function closeDropdown() {
+                if (isOpen) {
+                    isOpen = false;
+                    dropdown.style.display = 'none';
+                    arrow.classList.remove('open');
+                    searchInput.value = '';
+                }
+            }
+            
+            // Event listeners
+            multiselectContainer.addEventListener('click', (e) => {
+                if (e.target === multiselectContainer || e.target.classList.contains('selected-items')) {
+                    openDropdown();
+                }
+            });
+            
+            searchInput.addEventListener('input', (e) => {
+                if (!isOpen && e.target.value.length > 0) {
+                    openDropdown();
+                } else if (e.target.value.length === 0) {
+                    closeDropdown();
+                }
+                filterOptions(e.target.value);
+            });
+            
+            searchInput.addEventListener('focus', () => {
+                if (options.length > 0 || isOpen) {
+                    openDropdown();
+                }
+            });
+            selectedItems.addEventListener('change',(e) => {
+                console.log(e)
+                applyFilter();
+            })
+            // Remove tag functionality
+            selectedItems.addEventListener('click', (e) => {
+                if (e.target.classList.contains('tag-remove')) {
+                    const value = e.target.dataset.value;
+                    selectedValues.delete(value);
+                    
+                    // **CRITICAL FIX**: Update the original select element
+                    Array.from(select.options).forEach(opt => {
+                        if (opt.value === value) {
+                            opt.selected = false;
+                        }
+                    });
+                    
+                    updateSelectedDisplay();
+                    applyFilter();
+                    
+                    // Update dropdown if open
+                    if (isOpen) {
+                        filterOptions(searchInput.value);
+                    }
+                }
+            });
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!container.contains(e.target)) {
+                    closeDropdown();
+                }
+            });
+            
+            // Keyboard navigation
+            multiselectContainer.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (!isOpen) {
+                        openDropdown();
+                    }
+                } else if (e.key === 'Escape') {
+                    closeDropdown();
+                }
+            });
+            
+            // Initial call for this specific select element
+            updateSelectedDisplay();
+            filterOptions();
+        });
+    }
+    
+    let originalData = null;
+    let filteredData = null; // Holds data after activeFilters are applied
+    let currentData = null;  // Holds data after both activeFilters and catalog number selection
+    let currentPivotData = null;
+    let currentCharts = []; // Array to hold multiple chart instances
+    let draggedElement = null;
+    let activeFilters = [];
+    let selectedCatalogNumbers = [];
+    let facetField = null; // Selected field for faceting
+
+    // Data input functions
+    function toggleDataInput() {
+        const panel = document.getElementById('data-input-panel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function updateAvailableFields() {
+        if (currentData.length === 0) return;
+
+        const fields = Object.keys(currentData[0]);
+        const fieldSelects = document.querySelectorAll('.field-select');
+        const facetSelect = document.getElementById('facet-field');
+
+        fieldSelects.forEach(selectElement => {
+            selectElement.innerHTML = '';
+            fields.forEach(field => {
+                const option = document.createElement('option');
+                option.value = field;
+                option.textContent = field;
+                selectElement.appendChild(option);
+            });
+        });
+        
+        // Update facet field select
+        facetSelect.innerHTML = '<option value="">None</option>';
+        fields.forEach(field => {
+            const option = document.createElement('option');
+            option.value = field;
+            option.textContent = field;
+            facetSelect.appendChild(option);
+        });
+        facetSelect.onchange = function() {
+            facetField = this.value;
+            updateChart();
+        };
+        
+        populateFilterFields();
+        convertMultiSelectToAutocomplete();
+    }
+
+    function populateFilterFields() {
+        const filterFieldSelect = document.getElementById('filter-field');
+        filterFieldSelect.innerHTML = '<option value="">Select Field</option>';
+        const allowedFields = ['StrykerGroupRegion', 'Area', 'Region', 'Country', 'Business Sector', 'Business Unit', 'Franchise', 'Product Line', 'IBP Level 5', 'IBP Level 6', 'IBP Level 7','CatalogNumber','birch','cluster', 'forecast_date', 'forecast_horizon', 'model_type', 'data_type'];
+        
+        allowedFields.forEach(field => {
+            const option = document.createElement('option');
+            option.value = field;
+            option.textContent = field;
+            filterFieldSelect.appendChild(option);
+        });
+        filterFieldSelect.onchange = updateFilterValueInput;
+    }
+
+    function updateFilterValueInput() {
+        const filterField = document.getElementById('filter-field').value;
+        const filterValueContainer = document.querySelector('.filter-controls');
+        let filterValueElement = document.getElementById('filter-value');
+
+        if (filterValueElement) {
+            filterValueElement.remove();
+        }
+
+        if (!filterField) {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.id = 'filter-value';
+            input.placeholder = 'Filter value';
+            input.className = 'filter-input';
+            filterValueContainer.insertBefore(input, filterValueContainer.children[2]);
+            return;
+        }
+
+        const selectElement = document.createElement('select');
+        selectElement.id = 'filter-value';
+        selectElement.setAttribute('multiple', 'true');
+        selectElement.className = 'filter-select';
+        selectElement.innerHTML = '<option value="">Select Value(s)</option>';
+
+        const uniqueValues = getUniqueValues(filterField);
+        uniqueValues.forEach(value => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value;
+            selectElement.appendChild(option);
+        });
+        filterValueContainer.insertBefore(selectElement, filterValueContainer.children[1]);
+        convertMultiSelectToAutocomplete();
+    }
+
+    function getUniqueValues(field) {
+        const values = new Set();
+        // Use currentData (filtered data) instead of originalData to get unique values
+        // This ensures we only get values that exist after filtering
+        currentData.forEach(row => {
+            if (row[field] !== undefined && row[field] !== null) {
+                values.add(String(row[field]));
+            }
+        });
+        return Array.from(values).sort();
+    }
+    
+    function clearFilters() {
+        activeFilters = [];
+        filterData();
+        document.querySelectorAll('.custom-multiselect').forEach(element => {
+            element.remove();
+        });
+        renderActiveFilters();
+        convertMultiSelectToAutocomplete();
+    }
+
+    function applyFilter() {
+        const field = document.getElementById('filter-field').value;
+        const filterValueElement = document.getElementById('filter-value');
+        let values = [];
+
+        if (filterValueElement.tagName === 'SELECT' && filterValueElement.multiple) {
+            values = Array.from(filterValueElement.selectedOptions).map(option => option.value);
+        } else {
+            values = [filterValueElement.value];
+        }
+
+        if (!field || values.length === 0 || (values.length === 1 && values[0] === '')) {
+            // Remove any existing filter for this field
+            const index = activeFilters.findIndex(f => f.field === field);
+            if (index !== -1) {
+                activeFilters.splice(index, 1);
+                filterData();
+                renderActiveFilters();
+            }
+            return;
+        }
+
+        // Check if there's already a filter for this field
+        const existingIndex = activeFilters.findIndex(f => f.field === field);
+        if (existingIndex !== -1) {
+            // Replace it
+            activeFilters[existingIndex] = { field, values };
+        } else {
+            // Add new
+            activeFilters.push({ field, values });
+        }
+
+        filterData();
+        renderActiveFilters();
+    }
+
+    function filterData() {
+    // Use a single pass through the data instead of multiple filter operations
+    filteredData = originalData.filter(row => {
+        // Check all filters at once
+        return activeFilters.every(filter => {
+            const rowValue = String(row[filter.field] || '').toLowerCase();
+            if (Array.isArray(filter.values)) {
+                return filter.values.some(val => rowValue.includes(String(val).toLowerCase()));
+            } else {
+                return rowValue.includes(String(filter.values).toLowerCase());
+            }
+        });
+    });
+    
+    // Then apply catalog number selection to filteredData -> currentData
+    if (selectedCatalogNumbers.length > 0) {
+        currentData = filteredData.filter(row => selectedCatalogNumbers.includes(row.CatalogNumber));
+    } else {
+        currentData = [...filteredData];
+    }
+    
+    updateRawDataView();
+    generatePivot();
+    renderCatalogNumberTable();
+}
+
+    function renderActiveFilters() {
+        const activeFiltersDiv = document.getElementById('active-filters');
+        activeFiltersDiv.innerHTML = '';
+        if (activeFilters.length === 0) {
+            activeFiltersDiv.innerHTML = '<p>No active filters.</p>';
+            return;
+        }
+        activeFilters.forEach((filter, index) => {
+            const filterTag = document.createElement('span');
+            filterTag.className = 'filter-tag';
+            const displayValue = Array.isArray(filter.values) ? filter.values.join(', ') : filter.values;
+            filterTag.innerHTML = `${filter.field}: "${displayValue}" <span class="remove-filter" data-index="${index}">&times;</span>`;
+            filterTag.querySelector('.remove-filter').addEventListener('click', removeFilter);
+            activeFiltersDiv.appendChild(filterTag);
+        });
+    }
+
+    function removeFilter(event) {
+        const index = parseInt(event.target.getAttribute('data-index'));
+        activeFilters.splice(index, 1);
+        filterData();
+        renderActiveFilters();
+    }
+
+    let rawDataCurrentPage = 1;
+    function changePage(page) {
+        rawDataCurrentPage = page;
+        updateRawDataView();
+    }
+
+    function updateRawDataView() {
+        const rawOutput = document.getElementById('raw-data-output');
+        
+        if (currentData.length === 0) {
+            rawOutput.innerHTML = `
+                <div class="empty-state">
+                    <h3>No Data Loaded</h3>
+                    <p>Load data to view raw data table.</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Add pagination variables
+        const rowsPerPage = 100;
+        const currentPage = rawDataCurrentPage || 1;
+        const totalPages = Math.ceil(currentData.length / rowsPerPage);
+        const startIndex = (currentPage - 1) * rowsPerPage;
+        const endIndex = Math.min(startIndex + rowsPerPage, currentData.length);
+
+        const fields = Object.keys(currentData[0]);
+        let html = '<table>';
+        
+        html += '<tr>';
+        fields.forEach(field => {
+            html += `<th>${field}</th>`;
+        });
+        html += '</tr>';
+        
+        const displayData = currentData.slice(startIndex, endIndex);
+        displayData.forEach(row => {
+            html += '<tr>';
+            fields.forEach(field => {
+                const value = row[field];
+                const cellClass = typeof value === 'number' ? 'numeric' : '';
+                html += `<td class="${cellClass}">${formatValue(value)}</td>`;
+            });
+            html += '</tr>';
+        });
+        
+        html += '</table>';
+        
+        // Add pagination controls
+        html += `<div class="pagination">
+            <span>Showing ${startIndex + 1}-${endIndex} of ${currentData.length} rows</span>
+            <div class="pagination-controls">
+                <button ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">Previous</button>
+                <span>Page ${currentPage} of ${totalPages}</span>
+                <button ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">Next</button>
+            </div>
+        </div>`;
+        
+        rawOutput.innerHTML = html;
+    }
+
+    // Tab switching
+    function switchTab(tabName) {
+        // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tabName + '-view').classList.add('active');
+            
+            // If switching to chart view, update chart
+            if (tabName === 'chart' && currentPivotData) {
+                setTimeout(() => updateChart(), 100);
+            }
+        }
+
+        // Initialize drag and drop
+        function initializeDragAndDrop() {
+            const dropZones = document.querySelectorAll('.field-list');
+
+            dropZones.forEach(zone => {
+                zone.addEventListener('dragover', handleDragOver);
+                zone.addEventListener('drop', handleDrop);
+                zone.addEventListener('dragenter', handleDragEnter);
+                zone.addEventListener('dragleave', handleDragLeave);
+            });
+        }
+
+        function handleDragStart(e) {
+            draggedElement = e.target;
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', e.target.outerHTML);
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            e.target.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.target.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.target.classList.remove('drag-over');
+
+            if (draggedElement) {
+                const fieldName = draggedElement.getAttribute('data-field');
+                const targetZone = e.target.getAttribute('data-zone');
+                
+                // Remove from current location
+                draggedElement.remove();
+                
+                // Add to new location
+                if (targetZone === 'values') {
+                    addFieldToValues(fieldName, e.target);
+                } else {
+                    addFieldToZone(fieldName, e.target);
+                }
+                
+                draggedElement = null;
+                generatePivot(); // Trigger pivot table generation after drop
+            }
+        }
+
+        function addFieldToZone(fieldName, targetZone) {
+            const newField = document.createElement('div');
+            newField.className = 'field-item';
+            newField.draggable = true;
+            newField.setAttribute('data-field', fieldName);
+            newField.textContent = fieldName;
+            
+            // Add event listeners
+            newField.addEventListener('dragstart', handleDragStart);
+            newField.addEventListener('dragend', handleDragEnd);
+            
+            targetZone.appendChild(newField);
+            generatePivot(); // Trigger pivot table generation after adding field
+        }
+
+        function addFieldToValues(fieldName, targetZone) {
+            const newField = document.createElement('div');
+            newField.className = 'field-item';
+            newField.draggable = true;
+            newField.setAttribute('data-field', fieldName);
+            
+            // Add aggregation selector for value fields
+            const select = document.createElement('select');
+            select.className = 'aggregation-select';
+            select.innerHTML = `
+                <option value="sum">Sum</option>
+                <option value="avg">Mean</option>
+                <option value="count">Count</option>
+                <option value="min">Min</option>
+                <option value="max">Max</option>
+            `;
+            
+            newField.innerHTML = `${fieldName} `;
+            newField.appendChild(select);
+            
+            // Add event listeners
+            newField.addEventListener('dragstart', handleDragStart);
+            newField.addEventListener('dragend', handleDragEnd);
+            select.addEventListener('change', generatePivot); // Add this line
+            
+            targetZone.appendChild(newField);
+            generatePivot(); // Trigger pivot table generation after adding value field
+        }
+
+        function generatePivot() {
+            const rowFields = getFieldsFromZone('rows');
+            const columnFields = getFieldsFromZone('columns');
+            const valueFields = getFieldsFromZone('values');
+
+            currentPivotData = createPivotTable(currentData, rowFields, columnFields, valueFields);
+            renderPivotTable(currentPivotData, rowFields, columnFields, valueFields);
+            generateMetrics(currentPivotData, rowFields, columnFields, valueFields);
+            
+            // Update chart if chart tab is active
+            if (document.getElementById('chart-view').classList.contains('active')) {
+                updateChart();
+            }
+        }
+
+        function getFieldsFromZone(zone) {
+            const zoneElement = document.getElementById(`${zone === 'rows' ? 'row' : zone === 'columns' ? 'column' : 'value'}-fields`);
+            const fields = [];
+            
+            if (zoneElement && zoneElement.tagName === 'SELECT') {
+                Array.from(zoneElement.selectedOptions).forEach(option => {
+                    const field = option.value;
+                    if (zone === 'values') {
+                        // Default to 'sum' for value fields, as there's no individual aggregation selector
+                        fields.push({field, aggregation: 'sum'});
+                    } else {
+                        fields.push(field);
+                    }
+                });
+            }
+            
+            return fields;
+        }
+
+        function createPivotTable(data, rowFields, columnFields, valueFields) {
+            const pivot = {};
+            const columnValues = new Set();
+            
+            // Collect all unique column values
+            if (columnFields.length > 0) {
+                data.forEach(row => {
+                    const colKey = columnFields.map(field => row[field]).join(' | ');
+                    columnValues.add(colKey);
+                });
+            }
+
+            // Group data by row fields
+            data.forEach(row => {
+                const rowKey = rowFields.length > 0 ? rowFields.map(field => row[field]).join(' | ') : 'Total';
+                const colKey = columnFields.length > 0 ? columnFields.map(field => row[field]).join(' | ') : 'Total';
+                
+                if (!pivot[rowKey]) {
+                    pivot[rowKey] = {};
+                }
+                
+                if (!pivot[rowKey][colKey]) {
+                    pivot[rowKey][colKey] = {};
+                }
+                
+                valueFields.forEach(valueField => {
+                    const {field, aggregation} = valueField;
+                    const key = `${field}_${aggregation}`;
+                    
+                    if (!pivot[rowKey][colKey][key]) {
+                        pivot[rowKey][colKey][key] = [];
+                    }
+                    
+                    pivot[rowKey][colKey][key].push(row[field]);
+                });
+            });
+
+            // Calculate aggregations
+            Object.keys(pivot).forEach(rowKey => {
+                Object.keys(pivot[rowKey]).forEach(colKey => {
+                    Object.keys(pivot[rowKey][colKey]).forEach(valueKey => {
+                        const values = pivot[rowKey][colKey][valueKey];
+                        const aggregation = valueKey.split('_')[1];
+                        
+                        pivot[rowKey][colKey][valueKey] = calculateAggregation(values, aggregation);
+                    });
+                });
+            });
+
+            return {
+                data: pivot,
+                columnValues: Array.from(columnValues).sort(),
+                rowKeys: Object.keys(pivot).sort()
+            };
+        }
+
+        function calculateAggregation(values, aggregation) {
+            switch (aggregation) {
+                case 'sum':
+                    return values.reduce((sum, val) => sum + (val || 0), 0);
+                case 'avg':
+                    return values.reduce((sum, val) => sum + (val || 0), 0) / values.length;
+                case 'count':
+                    return values.length;
+                case 'min':
+                    return Math.min(...values.filter(v => v != null));
+                case 'max':
+                    return Math.max(...values.filter(v => v != null));
+                default:
+                    return values.reduce((sum, val) => sum + (val || 0), 0);
+            }
+        }
+
+        function renderPivotTable(pivotData, rowFields, columnFields, valueFields) {
+            const outputDiv = document.getElementById('pivot-output');
+            
+            let html = '<div class="pivot-table"><table>';
+            
+            // Header row
+            html += '<tr>';
+            if (rowFields.length > 0) {
+                html += `<th>${rowFields.join(' / ')}</th>`;
+            }
+            
+            if (columnFields.length === 0) {
+                valueFields.forEach(vf => {
+                    html += `<th>${vf.field} (${vf.aggregation})</th>`;
+                });
+            } else {
+                pivotData.columnValues.forEach(colValue => {
+                    valueFields.forEach(vf => {
+                        html += `<th>${colValue}<br><small>${vf.field} (${vf.aggregation})</small></th>`;
+                    });
+                });
+            }
+            html += '</tr>';
+            
+            // Data rows
+            pivotData.rowKeys.forEach(rowKey => {
+                html += '<tr>';
+                if (rowFields.length > 0) {
+                    html += `<td><strong>${rowKey}</strong></td>`;
+                }
+                
+                if (columnFields.length === 0) {
+                    valueFields.forEach(vf => {
+                        const key = `${vf.field}_${vf.aggregation}`;
+                        const value = pivotData.data[rowKey]['Total'] ? pivotData.data[rowKey]['Total'][key] : 0;
+                        html += `<td class="numeric">${formatNumber(value)}</td>`;
+                    });
+                } else {
+                    pivotData.columnValues.forEach(colValue => {
+                        valueFields.forEach(vf => {
+                            const key = `${vf.field}_${vf.aggregation}`;
+                            const value = pivotData.data[rowKey][colValue] ? pivotData.data[rowKey][colValue][key] : 0;
+                            html += `<td class="numeric">${formatNumber(value)}</td>`;
+                        });
+                    });
+                }
+                html += '</tr>';
+            });
+            
+            html += '</table></div>';
+            outputDiv.innerHTML = html;
+        }
+
+        function generateMetrics(pivotData, rowFields, columnFields, valueFields) {
+            const metricsGrid = document.getElementById('metrics-grid');
+            
+            if (!pivotData || valueFields.length === 0) {
+                metricsGrid.innerHTML = `
+                    <div class="empty-state">
+                        <h3>No Metrics Available</h3>
+                        <p>Generate a pivot table first to see key metrics.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            
+            // Group data by SALES_DATE for QoQ calculations (quarterly)
+            const salesDataByQuarter = {};
+            // Group data by SALES_DATE for YoY calculations (yearly)
+            const salesDataByYear = {};
+
+            currentData.forEach(row => {
+                const salesDate = row['SALES_DATE'];
+                if (salesDate) {
+                    const date = new Date(salesDate);
+                    const year = date.getFullYear();
+                    const month = date.getMonth(); // 0-11
+                    const quarter = Math.floor(month / 3) + 1;
+                    const yearQuarter = `${year}-Q${quarter}`;
+                    
+                    // For QoQ
+                    if (!salesDataByQuarter[yearQuarter]) {
+                        salesDataByQuarter[yearQuarter] = {};
+                    }
+                    // For YoY
+                    if (!salesDataByYear[year]) {
+                        salesDataByYear[year] = {};
+                    }
+
+                    valueFields.forEach(vf => {
+                        const field = vf.field;
+                        const value = row[field];
+
+                        // For QoQ
+                        if (!salesDataByQuarter[yearQuarter][field]) {
+                            salesDataByQuarter[yearQuarter][field] = [];
+                        }
+                        if (value !== undefined && value !== null && !isNaN(value)) {
+                            salesDataByQuarter[yearQuarter][field].push(value);
+                        }
+
+                        // For YoY
+                        if (!salesDataByYear[year][field]) {
+                            salesDataByYear[year][field] = [];
+                        }
+                        if (value !== undefined && value !== null && !isNaN(value)) {
+                            salesDataByYear[year][field].push(value);
+                        }
+                    });
+                }
+            });
+
+            const sortedQuarters = Object.keys(salesDataByQuarter).sort();
+            const sortedYears = Object.keys(salesDataByYear).sort();
+
+            valueFields.forEach(vf => {
+                const field = vf.field;
+                
+                // QoQ Table
+                html += `<div class="pivot-table"><table>`;
+                html += `<h3 style="padding-left:20px;font-weight:500;">${field} (${vf.aggregation}) QoQ Growth</h3>`;
+                html += `<tr><th>Quarter</th><th>Value</th><th>QoQ Growth</th></tr>`;
+
+                sortedQuarters.forEach((currentQY, index) => {
+                    const [currentYearStr, currentQuarterStr] = currentQY.split('-Q');
+                    const currentYear = parseInt(currentYearStr);
+                    const currentQuarter = parseInt(currentQuarterStr);
+
+                    const currentValue = salesDataByQuarter[currentQY] && salesDataByQuarter[currentQY][field] ?
+                                         calculateAggregation(salesDataByQuarter[currentQY][field], vf.aggregation) : 0;
+
+                    let qoqGrowth = 'N/A';
+                    if (index > 0) {
+                        let prevQuarterYear = currentYear;
+                        let prevQuarter = currentQuarter - 1;
+                        if (prevQuarter === 0) {
+                            prevQuarter = 4;
+                            prevQuarterYear--;
+                        }
+                        const prevQY = `${prevQuarterYear}-Q${prevQuarter}`;
+                        const prevValue = salesDataByQuarter[prevQY] && salesDataByQuarter[prevQY][field] ?
+                                          calculateAggregation(salesDataByQuarter[prevQY][field], vf.aggregation) : 0;
+                        
+                        if (prevValue !== 0) {
+                            qoqGrowth = (((currentValue - prevValue) / prevValue) * 100).toFixed(2) + '%';
+                        } else if (currentValue !== 0) {
+                            qoqGrowth = 'Inf%';
+                        } else {
+                            qoqGrowth = '0.00%';
+                        }
+                    }
+
+                    html += `
+                        <tr>
+                            <td>${currentQY}</td>
+                            <td class="numeric">${formatNumber(currentValue)}</td>
+                            <td>${qoqGrowth}</td>
+                        </tr>
+                    `;
+                });
+                html += `</table></div>`;
+
+                // YoY Table (Full Calendar Year)
+                html += `<div class="pivot-table"><table>`;
+                html += `<h3 style="padding-left:20px;font-weight:500;">${field} (${vf.aggregation}) YoY Growth (Full Year)</h3>`;
+                html += `<tr><th>Year</th><th>Value</th><th>YoY Growth</th></tr>`;
+
+                sortedYears.forEach((currentYear, index) => {
+                    const currentValue = salesDataByYear[currentYear] && salesDataByYear[currentYear][field] ?
+                                         calculateAggregation(salesDataByYear[currentYear][field], vf.aggregation) : 0;
+
+                    let yoyGrowth = 'N/A';
+                    if (index > 0) {
+                        const prevYear = parseInt(currentYear) - 1;
+                        const prevYearValue = salesDataByYear[prevYear] && salesDataByYear[prevYear][field] ?
+                                              calculateAggregation(salesDataByYear[prevYear][field], vf.aggregation) : 0;
+                        
+                        if (prevYearValue !== 0) {
+                            yoyGrowth = (((currentValue - prevYearValue) / prevYearValue) * 100).toFixed(2) + '%';
+                        } else if (currentValue !== 0) {
+                            yoyGrowth = 'Inf%';
+                        } else {
+                            yoyGrowth = '0.00%';
+                        }
+                    }
+
+                    html += `
+                        <tr>
+                            <td>${currentYear}</td>
+                            <td class="numeric">${formatNumber(currentValue)}</td>
+                            <td>${yoyGrowth}</td>
+                        </tr>
+                    `;
+                });
+                html += `</table></div>`;
+            });
+            
+            metricsGrid.innerHTML = html;
+        }
+
+        function updateChart() {
+            const chartContainer = document.getElementById('chart-container');
+            chartContainer.innerHTML = ''; // Clear existing charts
+            
+            // Destroy any existing charts
+            currentCharts.forEach(chart => chart.destroy());
+            currentCharts = [];
+            if (!currentPivotData) return;
+            
+            const chartType = document.getElementById('chart-type').value;
+            const maxCharts = parseInt(document.getElementById('chart-limit').value) || 10;
+            
+            if (!facetField) {
+                // No facet - single chart
+                const canvas = document.createElement('canvas');
+                canvas.width = 400;
+                canvas.height = 200;
+                chartContainer.appendChild(canvas);
+                
+                const ctx = canvas.getContext('2d');
+                const chartData = prepareChartData(currentPivotData);
+                const config = createChartConfig(chartType, chartData);
+                currentCharts.push(new Chart(ctx, config));
+            } else {
+                // Facet charts - but only create charts for facet values that have data after filtering
+                let uniqueFacetValues = [];
+                
+                // Get unique facet values only from the filtered data
+                if (currentData && currentData.length > 0) {
+                    uniqueFacetValues = [...new Set(currentData.map(row => row[facetField].toString()))];
+                }
+                
+                // Limit to max charts
+                uniqueFacetValues = uniqueFacetValues.slice(0, maxCharts);
+                
+                // Only create charts for facet values that have data
+                uniqueFacetValues.forEach(facetValue => {
+                    const facetData = currentData.filter(row => row[facetField].toString() === facetValue);
+                    
+                    // Only create chart if there's data for this facet value
+                    if (facetData.length > 0) {
+                        const pivotData = createPivotTable(facetData,
+                            getFieldsFromZone('rows'),
+                            getFieldsFromZone('columns'),
+                            getFieldsFromZone('values'));
+                        
+                        const chartDiv = document.createElement('div');
+                        chartDiv.className = 'facet-chart';
+                        
+                        const chartWrapper = document.createElement('div');
+                        chartWrapper.style.width = '450px';
+                        chartWrapper.style.height = '400px';
+                        chartWrapper.style.position = 'relative';
+                        chartWrapper.style.marginBottom = '10px';
+
+                        const canvas = document.createElement('canvas');
+                        chartWrapper.appendChild(canvas);
+                        chartDiv.appendChild(chartWrapper);
+                        
+                        chartContainer.appendChild(chartDiv);
+                        
+                        const ctx = canvas.getContext('2d');
+                        const chartData = prepareChartData(pivotData);
+                        const config = createChartConfig(chartType, chartData, `${facetField}: ${facetValue}`);
+                        currentCharts.push(new Chart(ctx, config));
+                    }
+                });
+            }
+        }
+        
+        function createChartConfig(chartType, chartData, title='Pivot Data Visualization') {
+            return {
+                type: chartType,
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: title
+                        },
+                        legend: {
+                            display: chartType !== 'pie' && chartType !== 'doughnut'
+                        }
+                    },
+                    scales: chartType === 'pie' || chartType === 'doughnut' || chartType === 'polarArea' ? {} : {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                pointRadius: 1,
+                }
+            };
+        }
+
+        function prepareChartData(pivotData) {
+            if (!pivotData) return { labels: [], datasets: [] };
+            
+            const columnFields = getFieldsFromZone('columns');
+            const valueFields = getFieldsFromZone('values');
+            const labels = pivotData.rowKeys.map(label => {
+        const date = new Date(label);
+        if (!isNaN(date.getTime())) {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return months[date.getMonth()] + '-' + date.getFullYear().toString().substr(-2);
+        }
+        return label; // Return original label if not a valid date
+    });
+            const datasets = [];
+            
+            if (columnFields.length === 0) {
+                valueFields.forEach((vf, index) => {
+                    const key = `${vf.field}_${vf.aggregation}`;
+                    const data = pivotData.rowKeys.map(rowKey => {
+                        return pivotData.data[rowKey]['Total']?.[key] || 0;
+                    });
+                    
+                    // For forecast fields, use a more descriptive label
+                    let label = `${vf.field} (${vf.aggregation})`;
+                    if (vf.field.startsWith('forecast_')) {
+                        const modelName = vf.field.replace('forecast_', '');
+                        label = `${modelName} Forecast`;
+                    }
+                    
+                    datasets.push({
+                        label: label,
+                        data: data,
+                        backgroundColor: generateColors(pivotData.rowKeys.length, index),
+                        borderColor: generateColors(pivotData.rowKeys.length, index, 0.8),
+                        borderWidth: 2
+                    });
+                });
+              } else {
+                pivotData.columnValues.forEach((colValue, colIndex) => {
+                    valueFields.forEach((vf, valIndex) => {
+                        const key = `${vf.field}_${vf.aggregation}`;
+                        const data = pivotData.rowKeys.map(rowKey => {
+                            return pivotData.data[rowKey]?.[colValue]?.[key] || 0;
+                        });
+                        
+                        // For forecast fields, use a more descriptive label
+                        let label = `${colValue} - ${vf.field} (${vf.aggregation})`;
+                        if (vf.field.startsWith('forecast_')) {
+                            const modelName = vf.field.replace('forecast_', '');
+                            label = `${colValue} - ${modelName} Forecast`;
+                        }
+                        
+                        datasets.push({
+                            label: label,
+                            data: data,
+                            backgroundColor: generateColors(pivotData.columnValues.length * valueFields.length, colIndex * valueFields.length + valIndex, 0.7),
+                            borderColor: generateColors(pivotData.columnValues.length * valueFields.length, colIndex * valueFields.length + valIndex, 1),
+                            borderWidth: 2
+                        });
+                    });
+                });
+            }
+            
+            return { labels, datasets };
+        }
+
+        function generateColors(count, index, alpha = 0.7) {
+            const colors = [
+                `rgba(102, 126, 234, ${alpha})`,
+                `rgba(118, 75, 162, ${alpha})`,
+                `rgba(255, 99, 132, ${alpha})`,
+                `rgba(54, 162, 235, ${alpha})`,
+                `rgba(255, 205, 86, ${alpha})`,
+                `rgba(75, 192, 192, ${alpha})`,
+                `rgba(153, 102, 255, ${alpha})`,
+                `rgba(255, 159, 64, ${alpha})`,
+                `rgba(199, 199, 199, ${alpha})`,
+                `rgba(83, 102, 255, ${alpha})`
+            ];
+            
+            //if (count === 1) {
+            //    return colors.slice(0, 10);
+            //}
+            
+            return colors[index % colors.length];
+        }
+
+        function formatNumber(num) {
+            if (num === null || num === undefined) return '0';
+            if (typeof num === 'number') {
+                return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+            }
+            return num;
+        }
+
+        function formatValue(value) {
+            if (typeof value === 'number') {
+                return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+            }
+            return value || '';
+        }
+
+        function renderCatalogNumberTable() {
+            const catalogNumberListDiv = document.getElementById('catalog-number-list');
+            catalogNumberListDiv.innerHTML = ''; // Clear existing list
+
+            if (!filteredData || filteredData.length === 0) {
+                catalogNumberListDiv.innerHTML = '<p>No data loaded.</p>';
+                return;
+            }
+
+            // Get unique catalog numbers from filtered data (after activeFilters)
+            const uniqueCatalogNumbers = Array.from(
+                new Set(filteredData.map(row => row.CatalogNumber).filter(cn => cn !== undefined && cn !== null))
+            ).sort();
+
+            if (uniqueCatalogNumbers.length === 0) {
+                catalogNumberListDiv.innerHTML = '<p>No Catalog Numbers found.</p>';
+                return;
+            }
+
+            uniqueCatalogNumbers.forEach(catalogNumber => {
+                const itemDiv = document.createElement('div');
+                itemDiv.textContent = catalogNumber;
+                itemDiv.setAttribute('data-catalog-number', catalogNumber);
+                if (selectedCatalogNumbers.includes(catalogNumber)) {
+                    itemDiv.classList.add('selected');
+                }
+                itemDiv.addEventListener('click', handleCatalogNumberClick);
+                catalogNumberListDiv.appendChild(itemDiv);
+            });
+        }
+
+        function handleCatalogNumberClick(event) {
+            const catalogNumber = event.target.getAttribute('data-catalog-number');
+            const index = selectedCatalogNumbers.indexOf(catalogNumber);
+            const isCtrlPressed = event.ctrlKey || event.metaKey; // metaKey for Mac
+            
+            // If Ctrl/Cmd is not pressed, clear all selections first
+            if (!isCtrlPressed) {
+                // Clear all selections except the one being clicked
+                document.querySelectorAll('#catalog-number-list div.selected').forEach(item => {
+                    if (item !== event.target) {
+                        item.classList.remove('selected');
+                    }
+                });
+                selectedCatalogNumbers = [];
+            }
+            
+            // Toggle the clicked item
+            if (index === -1) {
+                selectedCatalogNumbers.push(catalogNumber);
+                event.target.classList.add('selected');
+            } else {
+                // Only allow deselection if Ctrl/Cmd is pressed or if it's the only selected item
+                if (isCtrlPressed || selectedCatalogNumbers.length === 1) {
+                    selectedCatalogNumbers.splice(index, 1);
+                    event.target.classList.remove('selected');
+                }
+            }
+            
+            filterData();
+        }
+        function resetCatalogNumberFilter() {
+            selectedCatalogNumbers = [];
+            const catalogNumberListDiv = document.getElementById('catalog-number-list');
+            catalogNumberListDiv.querySelectorAll('div').forEach(item => {
+                item.classList.remove('selected');
+            });
+            filterData(); // Will update currentData without catalog number filter
+        }
+
+        function clearAll() {
+            const zones = ['row-fields', 'column-fields', 'value-fields'];
+            
+            zones.forEach(zoneId => {
+                const selectElement = document.getElementById(zoneId);
+                if (selectElement && selectElement.tagName === 'SELECT') {
+                    Array.from(selectElement.options).forEach(option => {
+                        option.selected = false; // Deselect all options
+                    });
+                    // Trigger update for custom multiselect displays
+                    if (selectElement && selectElement._updateCustomDisplay) {
+                        selectElement._updateCustomDisplay();
+                    }
+                }
+            });
+            
+            // Reset facet field
+            const facetSelect = document.getElementById('facet-field');
+            facetSelect.value = '';
+            facetField = null;
+            
+            // Clear outputs
+            document.getElementById('pivot-output').innerHTML = `
+                <div class="empty-state">
+                    <h3>No Pivot Table Generated</h3>
+                    <p>Select fields from the dropdowns in the Rows, Columns, or Values sections and click "Generate Analysis" to start analyzing your data.</p>
+                </div>
+            `;
+            
+            document.getElementById('metrics-grid').innerHTML = `
+                <div class="empty-state">
+                    <h3>No Metrics Available</h3>
+                    <p>Generate a pivot table first to see key metrics.</p>
+                </div>
+            `;
+            
+            // Destroy all charts
+            currentCharts.forEach(chart => chart.destroy());
+            currentCharts = [];
+            currentPivotData = null;
+            generatePivot(); // Trigger pivot table generation after clearing all
+        }
+
+        function exportData() {
+            if (!currentPivotData) {
+                alert('Generate a pivot table first to export data.');
+                return;
+            }
+            
+            const rowFields = getFieldsFromZone('rows');
+            const columnFields = getFieldsFromZone('columns');
+            const valueFields = getFieldsFromZone('values');
+            
+            let csvContent = '';
+            
+            // Header row
+            const headers = [];
+            if (rowFields.length > 0) {
+                headers.push(rowFields.join(' / '));
+            }
+            
+            if (columnFields.length === 0) {
+                valueFields.forEach(vf => {
+                    headers.push(`${vf.field} (${vf.aggregation})`);
+                });
+            } else {
+                currentPivotData.columnValues.forEach(colValue => {
+                    valueFields.forEach(vf => {
+                        headers.push(`${colValue} - ${vf.field} (${vf.aggregation})`);
+                    });
+                });
+            }
+            
+            csvContent += headers.join(',') + '\\n';
+            
+            // Data rows
+            currentPivotData.rowKeys.forEach(rowKey => {
+                const row = [];
+                if (rowFields.length > 0) {
+                    row.push(`"${rowKey}"`);
+                }
+                
+                if (columnFields.length === 0) {
+                    valueFields.forEach(vf => {
+                        const key = `${vf.field}_${vf.aggregation}`;
+                        const value = currentPivotData.data[rowKey]['Total'] ? currentPivotData.data[rowKey]['Total'][key] : 0;
+                        row.push(value);
+                    });
+                } else {
+                    currentPivotData.columnValues.forEach(colValue => {
+                        valueFields.forEach(vf => {
+                            const key = `${vf.field}_${vf.aggregation}`;
+                            const value = currentPivotData.data[rowKey][colValue] ? currentPivotData.data[rowKey][colValue][key] : 0;
+                            row.push(value);
+                        });
+                    });
+                }
+                
+                csvContent += row.join(',') + '\\n';
+            });
+            
+            // Download CSV
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'pivot_analysis.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+        function exportRawData() {
+            if (!currentData || currentData.length === 0) {
+                alert('No raw data available to export.');
+                return;
+            }
+
+            const fields = Object.keys(currentData[0]);
+            let csvContent = '';
+
+            // Header row
+            csvContent += fields.map(field => `"${field}"`).join(',') + '\\n';
+
+            // Data rows
+            currentData.forEach(row => {
+                const rowValues = fields.map(field => {
+                    const value = row[field];
+                    // Handle values that might contain commas or newlines by enclosing them in quotes
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('\\n') || value.includes('"'))) {
+                        return `"${value.replace(/"/g, '""')}"`; // Escape double quotes
+                    }
+                    return value;
+                });
+                csvContent += rowValues.join(',') + '\\n';
+            });
+
+            // Download CSV
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'raw_data.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Function to programmatically load data
+        function loadDataProgrammatically(data) {
+            if (!Array.isArray(data) || data.length === 0) {
+                alert('Invalid data provided. Please provide an array of objects.');
+                return;
+            }
+            
+            // Show loading indicator
+            const loadingIndicator = document.createElement('div');
+            loadingIndicator.className = 'loading-indicator';
+            loadingIndicator.innerHTML = '<p>Loading data...</p><div class="progress-bar"><div class="progress"></div></div>';
+            document.body.appendChild(loadingIndicator);
+            
+            // Process data in chunks to avoid UI freezing
+            originalData = data;
+            
+            // Use setTimeout to allow UI to update before processing
+            setTimeout(() => {
+                // Process in background
+                filteredData = [...originalData];
+                currentData = [...originalData];
+                
+                // Update UI
+                updateAvailableFields();
+                clearAll();
+                clearFilters();
+                
+                // Remove loading indicator
+                document.body.removeChild(loadingIndicator);
+                
+                // Update views
+                updateRawDataView();
+                renderCatalogNumberTable();
+                
+                // Set default selections
+                const rowFieldsSelect = document.getElementById('row-fields');
+                const columnFieldsSelect = document.getElementById('column-fields');
+                const valueFieldsSelect = document.getElementById('value-fields');
+
+                // Clear existing selections first
+                Array.from(rowFieldsSelect.options).forEach(option => option.selected = false);
+                const resetLink = document.getElementById('reset-catalog-filter');
+                if (resetLink) {
+                    resetLink.addEventListener('click', function(e) {
+                        e.preventDefault(); // Prevent default link behavior
+                        resetCatalogNumberFilter();
+                    });
+                }
+                Array.from(columnFieldsSelect.options).forEach(option => option.selected = false);
+                Array.from(valueFieldsSelect.options).forEach(option => option.selected = false);
+
+                // Select default row field
+                const defaultRowField = 'SALES_DATE';
+                const rowOption = Array.from(rowFieldsSelect.options).find(opt => opt.value === defaultRowField);
+                if (rowOption) {
+                    rowOption.selected = true;
+                }
+
+                // Select default value fields (include forecast values)
+                // We now have separate forecast columns for each model type
+                const defaultValueFields = ['Act Orders Rev'];
+                // Add all forecast columns dynamically
+                if (originalData && originalData.length > 0) {
+                    const firstRow = originalData[0];
+                    Object.keys(firstRow).forEach(key => {
+                        if (key.startsWith('forecast_')) {
+                            defaultValueFields.push(key);
+                        }
+                    });
+                }
+                // Fallback to some common forecast fields if no data is loaded yet
+                if (defaultValueFields.length === 1) {
+                    defaultValueFields.push('forecast_NHITS', 'forecast_Ensemble', 'forecast_AutoARIMA');
+                }
+                defaultValueFields.forEach(field => {
+                    const valueOption = Array.from(valueFieldsSelect.options).find(opt => opt.value === field);
+                    if (valueOption) {
+                        valueOption.selected = true;
+                    }
+                });
+
+                // Trigger change events to update the custom autocomplete display
+                [rowFieldsSelect, columnFieldsSelect, valueFieldsSelect].forEach(s => {
+                    if (s._updateCustomDisplay) {
+                        s._updateCustomDisplay();
+                    }
+                });
+                
+                generatePivot(); // Generate pivot table with default values
+            }, 100);
+        }
+
+        // Expose the function globally for external calls (e.g., from parent window or other scripts)
+        //window.loadPivotData = loadDataProgrammatically;
+        
+        // Forecast functionality
+        function loadForecastData() {
+            const horizon = document.getElementById('forecast-horizon').value;
+            const cycle = document.getElementById('forecast-cycle').value;
+
+            // Show loading state
+            const tableBody = document.getElementById('forecast-table-body');
+            tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px;"><div>Loading forecast data...</div></td></tr>';
+
+            // Filter forecast data from the loaded dataset
+            setTimeout(() => {
+                let forecastData = [];
+
+                if (currentData && currentData.length > 0) {
+                    // With our new pivoted data structure, we no longer have rows with data_type = 'forecast'
+                    // Instead, we have separate columns for each model's forecast values
+                    // Let's collect all forecast data by looking for columns that start with 'forecast_'
+                    const forecastColumns = [];
+                    const firstRow = currentData[0];
+                    Object.keys(firstRow).forEach(key => {
+                        if (key.startsWith('forecast_')) {
+                            forecastColumns.push(key);
+                        }
+                    });
+                    
+                    // Create a summary of forecast data for display
+                    forecastData = [];
+                    currentData.forEach(row => {
+                        forecastColumns.forEach(column => {
+                            if (row[column] !== undefined && row[column] !== null) {
+                                forecastData.push({
+                                    item_skey: row.item_skey || 'N/A',
+                                    location_skey: row.location_skey || 'N/A',
+                                    forecast_date: row.SALES_DATE || 'N/A',
+                                    forecast_horizon: 'N/A', // This information is not available in pivoted data
+                                    model_type: column.replace('forecast_', ''),
+                                    forecast_value: row[column],
+                                    is_current: true // All loaded forecasts are considered current
+                                });
+                            }
+                        });
+                    });
+
+                    // Apply horizon and cycle filters if needed
+                    // Note: These filters can't be applied with the current pivoted data structure
+                    // They would need to be applied at the database query level instead
+                }
+
+                updateForecastTable(forecastData);
+                updateForecastSummary(forecastData);
+                
+                // Refresh pivot table and charts
+                if (currentData.length > 0) {
+                    currentPivotData = createPivotTable(
+                        currentData,
+                        getFieldsFromZone('rows'),
+                        getFieldsFromZone('columns'),
+                        getFieldsFromZone('values')
+                    );
+                    
+                    // Update chart if chart tab is active
+                    if (document.getElementById('chart-view').classList.contains('active')) {
+                        updateChart();
+                    }
+                }
+            }, 500);
+        }
+        
+        function updateForecastTable(data) {
+            const tableBody = document.getElementById('forecast-table-body');
+
+            if (!data || data.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: #666;">No forecast data available</td></tr>';
+                return;
+            }
+
+            let html = '';
+            data.forEach(row => {
+                const status = row.is_current ? '<span style="color: green;">✓ Current</span>' : '<span style="color: orange;">⏳ Pending</span>';
+                html += `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${row.item_skey || 'N/A'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${row.location_skey || 'N/A'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${row.forecast_date || 'N/A'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${row.forecast_horizon || 'N/A'} months</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${row.model_type || 'N/A'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatValue(row.forecast_value)}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">N/A</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">N/A</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${status}</td>
+                    </tr>
+                `;
+            });
+
+            tableBody.innerHTML = html;
+        }
+        
+        function updateForecastSummary(data) {
+            if (!data || data.length === 0) {
+                document.getElementById('total-forecasts').textContent = '0';
+                document.getElementById('approved-forecasts').textContent = '0';
+                document.getElementById('current-cycle').textContent = 'N/A';
+                document.getElementById('avg-forecast-value').textContent = '0';
+                return;
+            }
+            
+            const total = data.length;
+            const approved = data.filter(d => d.is_current).length;
+            const avgValue = data.reduce((sum, d) => sum + (d.forecast_value || 0), 0) / data.length;
+            
+            document.getElementById('total-forecasts').textContent = total;
+            document.getElementById('approved-forecasts').textContent = approved;
+            document.getElementById('current-cycle').textContent = new Date().toLocaleDateString();
+            document.getElementById('avg-forecast-value').textContent = formatValue(avgValue);
+        }
+        
+        function exportForecastData() {
+            const table = document.getElementById('forecast-table');
+            if (!table) {
+                alert('No forecast data to export');
+                return;
+            }
+            
+            let csvContent = '';
+            
+            // Get headers
+            const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent);
+            csvContent += headers.join(',') + '\\n';
+            
+            // Get data rows
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const cells = Array.from(row.querySelectorAll('td')).map(td => {
+                    const text = td.textContent.trim();
+                    // Escape quotes and wrap in quotes if contains comma or quote
+                    if (text.includes(',') || text.includes('"')) {
+                        return `"${text.replace(/"/g, '""')}"`;
+                    }
+                    return text;
+                });
+                csvContent += cells.join(',') + '\\n';
+            });
+            
+            // Download CSV
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'forecast_data.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+        
+        // Validation functionality
+        function runModelValidation() {
+            const period = document.getElementById('validation-period').value;
+            
+            // Show loading state
+            const tableBody = document.getElementById('validation-table-body');
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;"><div>Running model validation...</div></td></tr>';
+            
+            // This would typically make an API call to run validation
+            // For now, we'll simulate with sample data
+            setTimeout(() => {
+                const sampleData = [
+                    {
+                        model_type: 'NHITS',
+                        validation_period: `${period} months`,
+                        mae: 12500,
+                        mape: 8.5,
+                        rmse: 15200,
+                        accuracy_percentage: 91.5
+                    },
+                    {
+                        model_type: 'Ensemble',
+                        validation_period: `${period} months`,
+                        mae: 9800,
+                        mape: 6.2,
+                        rmse: 12400,
+                        accuracy_percentage: 93.8
+                    },
+                    {
+                        model_type: 'Linear Regression',
+                        validation_period: `${period} months`,
+                        mae: 15600,
+                        mape: 12.1,
+                        rmse: 18900,
+                        accuracy_percentage: 87.9
+                    }
+                ];
+                
+                updateValidationTable(sampleData);
+                updateValidationSummary(sampleData);
+                updateValidationChart(sampleData);
+            }, 2000);
+        }
+        
+        function updateValidationTable(data) {
+            const tableBody = document.getElementById('validation-table-body');
+            
+            if (!data || data.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: #666;">No validation data available</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            data.forEach(row => {
+                html += `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${row.model_type}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${row.validation_period}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatValue(row.mae)}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${row.mape}%</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatValue(row.rmse)}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${row.accuracy_percentage}%</td>
+                    </tr>
+                `;
+            });
+            
+            tableBody.innerHTML = html;
+        }
+        
+        function updateValidationSummary(data) {
+            if (!data || data.length === 0) {
+                document.getElementById('best-model').textContent = 'N/A';
+                document.getElementById('avg-mape').textContent = '0%';
+                document.getElementById('avg-rmse').textContent = '0';
+                document.getElementById('overall-accuracy').textContent = '0%';
+                return;
+            }
+            
+            const bestModel = data.reduce((best, current) => 
+                current.accuracy_percentage > best.accuracy_percentage ? current : best
+            );
+            
+            const avgMape = data.reduce((sum, d) => sum + d.mape, 0) / data.length;
+            const avgRmse = data.reduce((sum, d) => sum + d.rmse, 0) / data.length;
+            const avgAccuracy = data.reduce((sum, d) => sum + d.accuracy_percentage, 0) / data.length;
+            
+            document.getElementById('best-model').textContent = bestModel.model_type;
+            document.getElementById('avg-mape').textContent = `${avgMape.toFixed(1)}%`;
+            document.getElementById('avg-rmse').textContent = formatValue(avgRmse);
+            document.getElementById('overall-accuracy').textContent = `${avgAccuracy.toFixed(1)}%`;
+        }
+        
+        function updateValidationChart(data) {
+            const ctx = document.getElementById('validationChart').getContext('2d');
+            
+            const labels = data.map(d => d.model_type);
+            const accuracyData = data.map(d => d.accuracy_percentage);
+            const mapeData = data.map(d => d.mape);
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Accuracy %',
+                        data: accuracyData,
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'MAPE %',
+                        data: mapeData,
+                        backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        function exportValidationReport() {
+            const table = document.getElementById('validation-table');
+            if (!table) {
+                alert('No validation data to export');
+                return;
+            }
+            
+            let csvContent = '';
+            
+            // Get headers
+            const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent);
+            csvContent += headers.join(',') + '\\n';
+            
+            // Get data rows
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const cells = Array.from(row.querySelectorAll('td')).map(td => {
+                    const text = td.textContent.trim();
+                    if (text.includes(',') || text.includes('"')) {
+                        return `"${text.replace(/"/g, '""')}"`;
+                    }
+                    return text;
+                });
+                csvContent += cells.join(',') + '\\n';
+            });
+            
+            // Download CSV
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'validation_report.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+        
+        // Handle template data - this will be replaced by actual data when rendered
+         try {
+            const templateData = {{df_json}};
+            if (Array.isArray(templateData)) {
+                loadDataProgrammatically(templateData);
+            }
+        } catch (e) {
+            console.log('Template data not available, waiting for external data load');
+        }
+        
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            // Instead of loading data directly, we'll wait for the server to call window.loadPivotData
+            //updateRawDataView();
+            // Ensure conversion happens after the DOM is ready and initial data might be loaded
+            convertMultiSelectToAutocomplete();
+        });
+    </script></body>

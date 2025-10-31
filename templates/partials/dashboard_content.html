@@ -1,0 +1,41 @@
+<div id="charts-container">
+    <div class="p-4 bg-green-50 rounded">
+        <p class="text-green-700">
+            Data loaded successfully! 
+            Found {{ metadata.total_records }} records for 
+            {{ filter_state.location1 }}: {{ filter_state.location2 }}, 
+            {{ filter_state.product1 }}: {{ filter_state.product2 }}
+        </p>
+    </div>
+</div>
+
+<div class="w-full h-full mt-6 p-0">
+    <h3 class="p-2 text-lg font-bold">Product and Model Data</h3>
+    <div id="details-table" class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    {% for col in metadata.columns[:10] %}
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        {{ col }}
+                    </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for row in data[:20] %}
+                <tr>
+                    {% for col in metadata.columns[:10] %}
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {{ row[col] }}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="p-4 text-sm text-gray-500">
+            Showing 20 of {{ metadata.total_records }} total records
+        </div>
+    </div>
+</div>
