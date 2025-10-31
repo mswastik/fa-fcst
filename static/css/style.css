@@ -2,6 +2,7 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    font-family: Cambria;
 }
 
 :root {
@@ -42,7 +43,7 @@
     display:none;
 }
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Cambria';
     background: linear-gradient(135deg, var(--brand-secondary) 0%, var(--brand-purple) 100%);
     min-height: 100vh;
 }
@@ -123,7 +124,7 @@ input:focus, select:focus, textarea:focus {
     min-height: 90vh;
     margin: 0 auto;
     background: rgba(255, 255, 255, 0.95);
-    border-radius: 10px;
+    border-radius: 0px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
     backdrop-filter: blur(10px);
     overflow: hidden;
@@ -364,7 +365,7 @@ input:focus, select:focus, textarea:focus {
     background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-orange) 100%);
     color: white;
     border: none;
-    padding: 10px 20px;
+    padding: 10px 12px;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 500;

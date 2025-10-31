@@ -44,15 +44,15 @@
     <div x-data="{ drawerOpen: false }" class="min-h-screen">
         <!-- Header -->
         <header class="bg-white shadow-sm border-b py-1">
-            <div class="w-full justify-between items-center px-4 py-1 flex">
+            <div style="background-color:rgb(var(--black)); color: #FFF;" class="w-full justify-between items-center px-4 py-0 flex">
                 <!-- Left side: App title and navigation -->
                 <div class="items-center gap-4 flex">
-                    <a href="/"><span class="text-lg font-bold text-gray-800 mr-4">ML Integration</span></a>
+                    <a href="/" style="color:rgb(var(--gold)); font-family: 'Arial Black';"><span class="text-lg font-bold mr-4">ML Integration</span></a>
                     <!-- Navigation links -->
-                    <div class="items-center gap-1 flex">
-                        <a href="/" class="text-sm px-3 py-1 rounded transition-colors duration-200 bg-blue-100 text-blue-700 font-semibold no-underline">Dashboard</a>
-                        <a href="/raw_data" class="text-sm px-3 py-1 rounded transition-colors duration-200 text-gray-600 hover:bg-gray-100 no-underline">Raw Data</a>
-                        <a href="/agent" class="text-sm px-3 py-1 rounded transition-colors duration-200 text-gray-600 hover:bg-gray-100 no-underline">Agent</a>
+                    <div style="font-family: 'Rockwell';" class="items-center gap-1 flex">
+                        <a href="/" class="px-3 py-3 transition-colors duration-200 font-bold no-underline">Dashboard</a>
+                        <a href="/raw_data" class="px-3 py-3 transition-colors duration-200 text-white hover:bg-white hover:text-black">Raw Data</a>
+                        <a href="/agent" class="px-3 py-3 transition-colors duration-200 text-white hover:bg-white hover:text-black no-underline">Agent</a>
                     </div>
                 </div>
                 
@@ -62,13 +62,13 @@
                         <icon class="text-blue-600 account_circle"></span>
                         <span class="text-sm text-gray-700">User</span>
                     </div>
-                    <button class="text-sm text-gray-600 hover:bg-gray-100 px-3 py-1 rounded transition-colors duration-200 no-underline">Logout</button>
+                    <button class="btn text-sm hover:bg-gray-100 px-3 py-1 rounded transition-colors duration-200 no-underline">Logout</button>
                 </div>
             </div>
         </header>
         
         <!-- Main content -->
-        <main class="container w-full mx-auto px-4 py-6">
+        <main class="container w-full mx-auto my-0 px-3 py-2">
             <div id="main-content">
                 <!-- Content will be loaded here by individual pages -->
                 {% block content %}{% endblock %}

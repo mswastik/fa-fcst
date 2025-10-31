@@ -2,11 +2,9 @@
 
 {% block content %}
 <div id="agent-container" x-data="agentData()" class="w-full">
-    <div class="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">Medical Device Market Research Agent</h2>
-        
+        <h2 class="text-xl font-bold text-gray-800 mb-4">Medical Device Market Research Agent</h2>
         <!-- Input Section -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Product</label>
                 <input 
@@ -37,14 +35,13 @@
                 <button 
                     @click="runAgent"
                     :disabled="isSearching"
-                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md disabled:opacity-50"
+                    class="btn px-4 py-2 rounded-md"
                     x-text="isSearching ? 'Searching...' : 'Run Agent'"
                 ></button>
             </div>
-        </div>
-        
+        </div>       
         <!-- Results Section -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
             <!-- Left Side: Table -->
             <div class="lg:col-span-1">
                 <div class="bg-gray-50 rounded-lg shadow p-4">
@@ -132,7 +129,7 @@
                         
                         <button 
                             @click="resetConfig"
-                            class="text-sm text-blue-600 hover:text-blue-800"
+                            class="btn text-sm"
                         >
                             Reset to Defaults
                         </button>
@@ -140,14 +137,14 @@
                     
                     <button 
                         @click="showConfig = !showConfig"
-                        class="self-start text-sm text-gray-600 hover:text-gray-800 mt-2"
+                        class="btn self-start text-sm mt-2"
                     >
                         <span x-text="showConfig ? 'Hide Config' : 'Show Config'"></span>
                     </button>
                 </div>
             </div>
         </div>
-    </div>
+
 </div>
 
 <script>

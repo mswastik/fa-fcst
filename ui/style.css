@@ -4,12 +4,46 @@
     box-sizing: border-box;
 }
 
+:root {
+    /* Primary color palette */
+    --white: 255, 255, 255;
+    --gold: 255, 181, 0;
+    --gray: 178, 180, 174;
+    --black: 0, 0, 0;
+    
+    /* Complementary color palette */
+    --orange: 175, 109, 4;
+    --purple: 133, 69, 138;
+    --blue: 28, 86, 135;
+    --teal: 76, 125, 122;
+    
+    /* Brand colors as RGB values for use with rgba() */
+    --brand-gold: rgb(var(--gold));
+    --brand-gold-rgb: var(--gold);
+    --brand-orange: rgb(var(--orange));
+    --brand-orange-rgb: var(--orange);
+    --brand-purple: rgb(var(--purple));
+    --brand-purple-rgb: var(--purple);
+    --brand-blue: rgb(var(--blue));
+    --brand-blue-rgb: var(--blue);
+    --brand-teal: rgb(var(--teal));
+    --brand-teal-rgb: var(--teal);
+    --brand-gray: rgb(var(--gray));
+    --brand-gray-rgb: var(--gray);
+    
+    /* Brand color variations for different uses */
+    --brand-primary: var(--brand-gold);
+    --brand-secondary: var(--brand-blue);
+    --brand-accent: var(--brand-orange);
+    --brand-complement: var(--brand-teal);
+}
+
 #app {
     display:none;
 }
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-purple) 100%);
     min-height: 100vh;
 }
 
@@ -24,7 +58,7 @@ body {
 }
 
 .header {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-orange) 100%);
     color: white;
     padding: 5px;
     text-align: center;
@@ -76,7 +110,7 @@ body {
     position: relative;
     top: 10px;
     z-index: 1000;
-    background: #667eea;
+    background: var(--brand-gold);
     color: white;
     border: none;
     padding: 2px 2px;
@@ -107,7 +141,7 @@ body {
 }
 
 .sidebar-toggle-button:hover {
-    background: #5a6fd8;
+    background: var(--brand-accent);
     transform: scale(1.03);
 }
 
@@ -211,7 +245,7 @@ body {
 }
 
 .field-item {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-orange) 100%);
     color: white;
     padding: 4px 8px;
     margin: 3px 0;
@@ -254,7 +288,7 @@ body {
 }
 
 .btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-orange) 100%);
     color: white;
     border: none;
     padding: 10px 20px;
@@ -271,11 +305,11 @@ body {
 }
 
 .btn.secondary {
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-teal) 100%);
 }
 
 .btn.danger {
-    background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+    background: linear-gradient(135deg, var(--brand-purple) 0%, var(--brand-orange) 100%);
 }
 
 .view-tabs {
@@ -297,7 +331,7 @@ body {
 }
 
 .tab.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-orange) 100%);
     color: white;
     transform: translateY(-2px);
 }
@@ -440,7 +474,7 @@ body {
 .metric-value {
     font-size: 2.5rem;
     font-weight: bold;
-    color: #667eea;
+    color: var(--brand-blue);
     margin-bottom: 10px;
 }
 
@@ -474,7 +508,7 @@ body {
     width: 20px;
     height: 20px;
     border: 3px solid #f3f3f3;
-    border-top: 3px solid #667eea;
+    border-top: 3px solid var(--brand-blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -514,7 +548,7 @@ body {
 }
 
 .selected-tag {
-    background: #007bff;
+    background: var(--brand-blue);
     color: white;
     padding: 2px 8px;
     border-radius: 12px;
