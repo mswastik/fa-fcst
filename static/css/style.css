@@ -44,7 +44,7 @@
 }
 body {
     font-family: 'Cambria';
-    background: linear-gradient(135deg, var(--brand-secondary) 0%, var(--brand-purple) 100%);
+    background: linear-gradient(135deg, #594B61, #545857);
     min-height: 100vh;
 }
 
@@ -362,13 +362,13 @@ input:focus, select:focus, textarea:focus {
 }
 
 .btn {
-    background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-orange) 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--brand-gold), var(--brand-gold), var(--brand-gold), var(--brand-gold), var(--brand-orange));
+    color: black;
     border: none;
     padding: 10px 12px;
     border-radius: 8px;
     cursor: pointer;
-    font-weight: 500;
+    font-weight: 700;
     transition: all 0.3s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
