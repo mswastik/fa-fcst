@@ -8,12 +8,14 @@ from fastapi.staticfiles import StaticFiles
 import json
 from typing import Dict, Any
 import polars as pl
+import pandas as pd
+import numpy as np
 
 from models.schemas import FilterState
 from services.state_service import state_service
 from services.data_service import data_service
 from services.filter_service import filter_service # Import filter_service
-from core.utils import UIUtils
+from core.utils import UIUtils, CustomJsonEncoder
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -56,9 +58,20 @@ async def raw_data_page(request: Request):
         session_id = f"session_{len(state_service.sessions) + 1}"
         request.session['session_id'] = session_id
     
-    session = state_service.get_session(session_id)
+    session = state_service.get_or_create_session(session_id)
     
-    # For now, return a basic template - we'll implement the full functionality later
+    # Only load filtered data that was applied in the root page instead of full dataset
+    # to avoid memory issues with large datasets
+    df_json = []
+    if session.filtered_df is not None and not session.filtered_df.is_empty():
+        # Use filtered data from the dashboard if available
+        # Convert to dictionaries first
+        df_json = session.filtered_df.to_dicts()
+    # If no filtered data is available, return empty array to avoid loading full dataset
+    # This will show an empty state in the UI but won't cause memory issues
+        
+    # Return the template with the data as a JSON string
     return templates.TemplateResponse("raw_data.html", {
-        "request": request
+        "request": request,
+        "df_json": json.dumps(df_json, cls=CustomJsonEncoder)
     })

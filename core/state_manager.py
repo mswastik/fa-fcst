@@ -23,9 +23,6 @@ class DataState:
     filtered_products: List[str] = field(default_factory=list)
     filtered_models: List[str] = field(default_factory=list)
 
-    # UI state
-    by_month: bool = False
-
     # UI state - Loading indicators for different components
     loading_charts: bool = False
     loading_table: bool = False
@@ -266,15 +263,9 @@ class DataState:
         chart_data = filtered_df.clone()
         print(f"DEBUG: Chart data prepared, proceeding to {chart_type} chart generation")
         
-        # Group by month if toggle is active
-        if self.by_month:
-            chart_data = chart_data.with_columns(
-                group=pl.col('SALES_DATE').dt.strftime('%b')
-            )
-        else:
-            chart_data = chart_data.with_columns(
-                group=pl.col('SALES_DATE')
-            )
+        chart_data = chart_data.with_columns(
+            group=pl.col('SALES_DATE')
+        )
         
         # Prepare data based on chart type
         if chart_type == 'column':
@@ -361,26 +352,15 @@ class DataState:
     def _get_line_chart_data(self, chart_data: pl.DataFrame) -> Dict[str, Any]:
         """Generate line chart data."""
         chart_data = chart_data.sort('group')
-        
-        if self.by_month:
-            agg_data = chart_data.group_by('group').sum()['Act Orders Rev']
-            forecast_values = []
-            if 'NHITS' in chart_data.columns:
-                agg_data = agg_data.with_columns(
-                    chart_data.group_by('group').sum()['NHITS']
-                )
-                forecast_values = agg_data['NHITS'].to_list()
-            x_values = agg_data['group'].to_list()
-        else:
-            # Aggregate by date for line chart
-            agg_data = chart_data.group_by('group').sum()['group', 'Act Orders Rev']
-            forecast_values = []
-            if 'NHITS' in chart_data.columns:
-                agg_data = agg_data.with_columns(
-                    chart_data.group_by('group').sum()['NHITS']
-                )
-                forecast_values = agg_data['NHITS'].to_list()
-            x_values = agg_data['group'].to_list()
+        # Aggregate by date for line chart
+        agg_data = chart_data.group_by('group').sum()['group', 'Act Orders Rev']
+        forecast_values = []
+        if 'NHITS' in chart_data.columns:
+            nhits_agg = chart_data.group_by('group').sum()['group', 'NHITS']
+            # Join with agg_data to get NHITS values  
+            agg_data = agg_data.join(nhits_agg, on='group', how='left')
+            forecast_values = agg_data['NHITS'].to_list()
+        x_values = agg_data['group'].to_list()
         
         return {
             'categories': x_values,

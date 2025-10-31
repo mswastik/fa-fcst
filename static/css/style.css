@@ -4,13 +4,118 @@
     box-sizing: border-box;
 }
 
+:root {
+    /* Primary color palette */
+    --white: 255, 255, 255;
+    --gold: 255, 181, 0;
+    --gray: 178, 180, 174;
+    --black: 0, 0, 0;
+    
+    /* Complementary color palette */
+    --orange: 175, 109, 4;
+    --purple: 133, 69, 138;
+    --blue: 28, 86, 135;
+    --teal: 76, 125, 122;
+    
+    /* Brand colors as RGB values for use with rgba() */
+    --brand-gold: rgb(var(--gold));
+    --brand-gold-rgb: var(--gold);
+    --brand-orange: rgb(var(--orange));
+    --brand-orange-rgb: var(--orange);
+    --brand-purple: rgb(var(--purple));
+    --brand-purple-rgb: var(--purple);
+    --brand-blue: rgb(var(--blue));
+    --brand-blue-rgb: var(--blue);
+    --brand-teal: rgb(var(--teal));
+    --brand-teal-rgb: var(--teal);
+    --brand-gray: rgb(var(--gray));
+    --brand-gray-rgb: var(--gray);
+    
+    /* Brand color variations for different uses */
+    --brand-primary: var(--brand-gold);
+    --brand-secondary: var(--brand-blue);
+    --brand-accent: var(--brand-orange);
+    --brand-complement: var(--brand-teal);
+}
+
 #app {
     display:none;
 }
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--brand-secondary) 0%, var(--brand-purple) 100%);
     min-height: 100vh;
+}
+
+/* Apply CSS variables as defaults */
+button {
+    background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-orange) 100%);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+button.secondary {
+    background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-teal) 100%);
+}
+
+button.danger {
+    background: linear-gradient(135deg, var(--brand-purple) 0%, var(--brand-orange) 100%);
+}
+
+input, select, textarea {
+    border: 1px solid #ced4da;
+    border-color: var(--brand-gray);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--brand-blue);
+    box-shadow: 0 0 0 3px rgba(var(--brand-blue-rgb), 0.25);
+}
+
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--brand-gray);
+}
+
+.table th {
+    background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-orange) 100%);
+    color: white;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+}
+
+.table td {
+    border-bottom: 1px solid var(--brand-gray);
+    border-right: 1px solid var(--brand-gray);
+}
+
+.metric-value {
+    color: var(--brand-blue);
+}
+
+.tab.active {
+    background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-orange) 100%);
+    color: white;
 }
 
 .container {
@@ -26,7 +131,7 @@ body {
 }
 
 .header {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-orange) 100%);
     color: white;
     padding: 5px;
     text-align: center;
@@ -256,7 +361,7 @@ body {
 }
 
 .btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-orange) 100%);
     color: white;
     border: none;
     padding: 10px 20px;
@@ -273,11 +378,11 @@ body {
 }
 
 .btn.secondary {
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-teal) 100%);
 }
 
 .btn.danger {
-    background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+    background: linear-gradient(135deg, var(--brand-purple) 0%, var(--brand-orange) 100%);
 }
 
 .view-tabs {

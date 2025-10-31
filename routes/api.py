@@ -320,9 +320,10 @@ async def update_dashboard(request: Request):
             
             if filtered_df is not None and not filtered_df.is_empty():
                 # Update session with filtered data
-                session.filtered_df = filtered_df
+                # Update both df and filtered_df with the new filtered data
+                # Do not modify full_df which should remain as the original complete dataset
                 session.df = filtered_df.clone()
-                session.full_df = filtered_df.clone()
+                session.filtered_df = filtered_df.clone()
                 
                 # Prepare data for charts
                 chart_data = session.get_chart_data('line')
@@ -432,16 +433,16 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                                     {{
                                         label: 'Actual',
                                         data: {json.dumps(values_json)},
-                                        borderColor: 'rgb(75, 192, 192)',
-                                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                        borderColor: 'var(--brand-blue)',
+                                        backgroundColor: 'rgba(var(--brand-blue-rgb), 0.2)',
                                         tension: 0.1,
                                         pointRadius: 3
                                     }}
                                     {", {{" +
                                       f"    label: 'Forecast',\n" +
                                       f"    data: {json.dumps(forecast_values_json)},\n" +
-                                      f"    borderColor: 'rgb(255, 99, 132)',\n" +
-                                      f"    backgroundColor: 'rgba(255, 99, 132, 0.2)',\n" +
+                                      f"    borderColor: 'var(--brand-gold)',\n" +
+                                      f"    backgroundColor: 'rgba(var(--brand-gold-rgb), 0.2)',\n" +
                                       f"    borderDash: [5, 5],\n" +
                                       f"    tension: 0.1,\n" +
                                       f"    pointRadius: 3\n" +
@@ -491,16 +492,16 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                                 {{
                                     label: 'Actual',
                                     data: {json.dumps(values_json)},
-                                    borderColor: 'rgb(75, 192, 192)',
-                                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                    borderColor: 'var(--brand-blue)',
+                                    backgroundColor: 'rgba(var(--brand-blue-rgb), 0.2)',
                                     tension: 0.1,
                                     pointRadius: 3
                                 }}
                                 {", {{" +
                                   f"    label: 'Forecast',\n" +
                                   f"    data: {json.dumps(forecast_values_json)},\n" +
-                                  f"    borderColor: 'rgb(255, 99, 132)',\n" +
-                                  f"    backgroundColor: 'rgba(255, 99, 132, 0.2)',\n" +
+                                  f"    borderColor: 'var(--brand-gold)',\n" +
+                                  f"    backgroundColor: 'rgba(var(--brand-gold-rgb), 0.2)',\n" +
                                   f"    borderDash: [5, 5],\n" +
                                   f"    tension: 0.1,\n" +
                                   f"    pointRadius: 3\n" +
@@ -546,12 +547,24 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
         
         # Prepare datasets from series
         datasets = []
-        for s in series:
+        for i, s in enumerate(series):
+            # Assign different colors based on position in series
+            color_index = i % 3  # Cycle through 3 main colors
+            if color_index == 0:
+                bg_color = 'rgba(var(--brand-blue-rgb), 0.2)'
+                border_color = 'var(--brand-blue)'
+            elif color_index == 1:
+                bg_color = 'rgba(var(--brand-gold-rgb), 0.2)'
+                border_color = 'var(--brand-gold)'
+            else:
+                bg_color = 'rgba(var(--brand-orange-rgb), 0.2)'
+                border_color = 'var(--brand-orange)'
+                
             datasets.append({
                 'label': s.get('name', ''),
                 'data': [float(v) if v is not None else None for v in s.get('data', [])],
-                'backgroundColor': s.get('color', 'rgba(54, 162, 235, 0.2)'),
-                'borderColor': s.get('color', 'rgba(54, 162, 235, 1)'),
+                'backgroundColor': s.get('color', bg_color),
+                'borderColor': s.get('color', border_color),
                 'borderWidth': 1,
                 'type': s.get('type', 'bar')
             })

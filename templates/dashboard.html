@@ -87,7 +87,7 @@
     <!-- Action Buttons -->
     <div class="w-full gap-2 flex mb-4">
         <button 
-            class="bg-green-100 px-4 py-2 rounded hover:bg-green-200 transition-colors"
+            class="btn px-4 py-2 rounded"
             hx-post="/api/actions"
             hx-vals="js:{action: 'segmentation', filter_state: getFilterState()}"
             hx-indicator=".htmx-indicator"
@@ -95,7 +95,7 @@
             Segmentation
         </button>
         <button 
-            class="bg-green-100 px-4 py-2 rounded hover:bg-green-200 transition-colors"
+            class="btn px-4 py-2 rounded"
             hx-post="/api/actions"
             hx-vals="js:{action: 'forecast', filter_state: getFilterState()}"
             hx-indicator=".htmx-indicator"
@@ -103,7 +103,7 @@
             Generate Forecast
         </button>
         <button 
-            class="bg-blue-100 px-4 py-2 rounded hover:bg-blue-200 transition-colors"
+            class="btn secondary px-4 py-2 rounded"
             hx-post="/api/actions"
             hx-vals="js:{action: 'validate', filter_state: getFilterState()}"
             hx-indicator=".htmx-indicator"
@@ -111,7 +111,7 @@
             Validate Models
         </button>
         <button 
-            class="bg-green-100 px-4 py-2 rounded hover:bg-green-200 transition-colors"
+            class="btn px-4 py-2 rounded"
             hx-post="/api/actions"
             hx-vals="js:{action: 'change_fc', filter_state: getFilterState()}"
             hx-indicator=".htmx-indicator"
@@ -119,7 +119,7 @@
             Change FC
         </button>
         <button 
-            class="bg-green-100 px-4 py-2 rounded hover:bg-green-200 transition-colors"
+            class="btn px-4 py-2 rounded"
             hx-post="/api/actions"
             hx-vals="js:{action: 'view', filter_state: getFilterState()}"
             hx-indicator=".htmx-indicator"

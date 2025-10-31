@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional
 import polars as pl
 from nicegui import ui
 from datetime import datetime
+from json import JSONEncoder
 
 
 # Column mapping constants
@@ -116,17 +117,14 @@ class DataUtils:
         # Rename 'sales_date' to 'SALES_DATE' for consistency with chart components
         if 'sales_date' in df.columns:
             df = df.rename({'sales_date': 'SALES_DATE'})
-            print("DEBUG: Renamed 'sales_date' to 'SALES_DATE'")
 
         # Rename 'act_orders_rev' to 'Act Orders Rev' for consistency with chart components
         if 'act_orders_rev' in df.columns:
             df = df.rename({'act_orders_rev': 'Act Orders Rev'})
-            print("DEBUG: Renamed 'act_orders_rev' to 'Act Orders Rev'")
 
         # Rename 'country' to 'Country' for consistency with chart components
         if 'country' in df.columns:
             df = df.rename({'country': 'Country'})
-            print("DEBUG: Renamed 'country' to 'Country'")
 
         df = DataUtils.apply_column_mapping(df)
         df = DataUtils.cast_numeric_columns(df)
@@ -212,6 +210,17 @@ FILTER_OPTIONS = {
         "Franchise", "IBP Level 5", "IBP Level 6", "CatalogNumber"
     ]
 }
+
+
+class CustomJsonEncoder(JSONEncoder):
+    """Custom JSON encoder to handle non-serializable types like datetime, NaN, and Inf."""
+    def default(self, o):
+        if isinstance(o, datetime):
+            return o.isoformat()
+        # Handle NaN and Inf which are not valid JSON numbers
+        if isinstance(o, float) and (o != o or o == float('inf') or o == float('-inf')):
+            return None
+        return JSONEncoder.default(self, o)
 
 
 def validate_environment_variables(required_vars: list) -> Dict[str, bool]:
