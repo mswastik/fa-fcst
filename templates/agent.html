@@ -76,13 +76,15 @@
             <!-- Right Side: Output -->
             <div class="lg:col-span-2">
                 <div class="bg-gray-50 rounded-lg shadow p-4 h-full flex flex-col">
+                    <div class="flex justify-between">
                     <h3 class="text-lg font-semibold mb-3">Agent Output</h3>
-                    <div 
-                        id="output-area"
-                        class="bg-white rounded border p-4 flex-grow overflow-y-auto mb-3 min-h-96 prose prose-sm sm:prose-base lg:prose-lg text-gray-900"
-                        x-html="outputHtml"
-                    ></div>
-                    
+                    <button 
+                        @click="showConfig = !showConfig"
+                        class="btn text-sm h-8 py-1"
+                    >
+                        <span x-text="showConfig ? 'Hide Config' : 'Agent Config'"></span>
+                    </button>
+                    </div>
                     <!-- Search Configuration Panel -->
                     <div 
                         x-show="showConfig" 
@@ -135,12 +137,13 @@
                         </button>
                     </div>
                     
-                    <button 
-                        @click="showConfig = !showConfig"
-                        class="btn self-start text-sm mt-2"
-                    >
-                        <span x-text="showConfig ? 'Hide Config' : 'Show Config'"></span>
-                    </button>
+                    
+                    <div 
+                        id="output-area"
+                        class="bg-white rounded border p-4 flex-grow overflow-y-auto mb-3 min-h-96 prose prose-sm sm:prose-base lg:prose-lg text-gray-900"
+                        x-html="outputHtml"
+                    ></div>
+                    
                 </div>
             </div>
         </div>
@@ -240,10 +243,14 @@
                     const decoder = new TextDecoder();
                     let buffer = '';
                     
+                    // Log the API call for debugging
+                    console.log('Starting agent stream for:', { product: this.product, region: this.region });
+                    
                     while (true) {
                         const { done, value } = await reader.read();
                         
                         if (done) {
+                            console.log('Stream finished');
                             break;
                         }
                         
@@ -256,6 +263,8 @@
                                 try {
                                     const data = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
                                     
+                                    console.log('Received data:', data);
+                                    
                                     if (data.type === 'status') {
                                         // Update status message
                                         this.outputHtml = `<div class="text-blue-600">${data.message}</div>`;
@@ -265,25 +274,23 @@
                                             this.sources = data.sources;
                                             let sourcesHtml = `
                                                 <div class="mb-4">
-                                                    <div class="flex items-center justify-between">
-                                                        <h4 class="font-semibold">Sources:</h4>
-                                                        <button 
-                                                            @click="showSources = !showSources"
-                                                            class="text-sm text-blue-600 hover:underline"
-                                                            x-text="showSources ? 'Hide Sources' : 'Show Sources'"
-                                                        ></button>
-                                                    </div>
-                                                    <div x-show="showSources" class="bg-gray-100 rounded p-3 mt-2 transition-all duration-300">
-                                                        <ul class="list-disc pl-5 space-y-1">
+                                                    <div class="bg-gray-100 rounded-lg shadow-sm p-4 border border-gray-200">
+                                                        <div class="flex items-center justify-between cursor-pointer" @click="showSources = !showSources">
+                                                            <h4 class="font-semibold text-gray-800">Sources</h4>
+                                                            <span class="ml-2" x-text="showSources ? '▲' : '▼'" class="text-gray-600"></span>
+                                                        </div>
+                                                        <div x-show="showSources" class="mt-4 transition-all duration-300 ease-in-out" style="overflow: hidden;" x-collapse>
+                                                            <ul class="list-disc pl-5 space-y-2">
                                             `;
                                             data.sources.forEach((source, index) => {
-                                                sourcesHtml += `<li><a href="${source.url}" target="_blank" class="text-blue-600 hover:underline">${source.url}</a></li>`;
+                                                sourcesHtml += `<li><a href="${source.url}" target="_blank" class="text-blue-600 hover:underline hover:text-blue-800">${source.url}</a></li>`;
                                             });
                                             sourcesHtml += `
-                                                        </ul>
+                                                            </ul>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div id="streaming-content" class="prose max-w-none"></div>
+                                                <div id="streaming-content" class="prose max-w-none mt-4"></div>
                                             `;
                                             this.outputHtml = sourcesHtml;
                                         } else {
@@ -315,12 +322,13 @@
                                     }
                                 } catch (e) {
                                     // Ignore malformed JSON lines
-                                    console.warn('Could not parse SSE data:', line);
+                                    console.warn('Could not parse SSE data:', line, 'Error:', e);
                                 }
                             }
                         }
                     }
                 } catch (error) {
+                    console.error('Error in runAgent:', error);
                     this.outputHtml = `<div class="text-red-600">Error: ${error.message}</div>`;
                 } finally {
                     this.isSearching = false;
