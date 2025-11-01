@@ -3,13 +3,14 @@ API routes for the FastAPI application.
 Handles filter updates, chart rendering, and action buttons.
 """
 from fastapi import APIRouter, Request, HTTPException, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 import json
 from typing import Dict, Any, List
 import polars as pl
 import re
 from typing import Optional
+import asyncio
 
 from models.schemas import FilterRequest, UpdateRequest, ActionRequest, FilterState
 from services.state_service import state_service
@@ -1079,7 +1080,7 @@ async def run_agent_api(request: Request):
                     # Ensure list items have proper spacing before them
                     if i > 0 and cleaned_lines and cleaned_lines[-1].strip():
                         # Add blank line before list item if previous line is not blank
-                        if not cleaned_lines[-1].strip().startswith(('#', '-', '*', '+')) and not cleaned_lines[-1].strip().startswith(tuple(f'{n}.' for n in range(1, 10))):
+                        if not cleaned_lines[-1].strip().startswith(('#', '-', '*', '+')) and not any(cleaned_lines[-1].strip().startswith(f'{n}.') for n in range(1, 10)):
                             cleaned_lines.append('')
 
                 # Handle paragraphs - ensure proper spacing
@@ -1093,8 +1094,7 @@ async def run_agent_api(request: Request):
                             not any(prev_line.startswith(f'{n}.') for n in range(1, 10)) and
                             not re.match(r'^\s*$', prev_line)):
                             # Add blank line between paragraphs if they're consecutive
-                            if len(line.strip()) > 50:  # Likely a paragraph, not a short line
-                                cleaned_lines.append('')
+                            cleaned_lines.append('')
 
                 cleaned_lines.append(line)
 
@@ -1212,3 +1212,205 @@ async def run_agent_api(request: Request):
             "success": False,
             "error": str(e)
         })
+
+@router.post("/api/agent-stream")
+async def run_agent_stream_api(request: Request):
+    """Run the agent with the provided parameters and return a streaming response"""
+    try:
+        data = await request.json()
+        product = data.get('product', '')
+        region = data.get('region', '')
+        search_query1 = data.get('search_query1', '')
+        search_query2 = data.get('search_query2', '')
+        role = data.get('role', 'Demand Planner')
+        objective = data.get('objective', '')
+        
+        # Validate inputs
+        if not product or not region:
+            return JSONResponse({
+                "success": False,
+                "error": "Both product and region are required"
+            })
+        
+        # Import required modules for the agent functionality
+        from ddgs import DDGS
+        from bs4 import BeautifulSoup
+        import requests
+        from openai import OpenAI
+        import re
+        
+        client = OpenAI(base_url="http://localhost:8080/v1", api_key="sk")
+        
+        def clean_markdown_content(content: str) -> str:
+            """
+            Clean and normalize markdown content to fix formatting issues.
+
+            Args:
+                content: Raw markdown content string
+
+            Returns:
+                Cleaned markdown content with proper spacing and heading levels
+            """
+            if not content:
+                return content
+
+            # Split into lines for processing
+            lines = content.split('\n')
+            cleaned_lines = []
+            in_code_block = False
+            code_block_marker = ''
+
+            for i, line in enumerate(lines):
+                # Handle headings - reduce level but preserve structure
+                if line.strip().startswith('#'):
+                    # Reduce heading levels: # -> ##, ## -> ###, ### -> ####, etc.
+                    heading_match = re.match(r'^(#{1,6})\s+(.+)$', line.strip())
+                    if heading_match:
+                        hashes, text = heading_match.groups()
+                        # Ensure minimum level is ##
+                        new_level = min(len(hashes) + 1, 6)
+                        new_hashes = '##' * new_level
+                        line = f"{new_hashes} {text}"
+
+                # Handle lists - ensure proper spacing
+                elif line.strip().startswith(('- ', '* ', '+ ', '1. ', '2. ', '3. ', '4. ', '5. ')):
+                    # Ensure list items have proper spacing before them
+                    if i > 0 and cleaned_lines and cleaned_lines[-1].strip():
+                        # Add blank line before list item if previous line is not blank
+                        if not cleaned_lines[-1].strip().startswith(('#', '-', '*', '+')) and not any(cleaned_lines[-1].strip().startswith(f'{n}.') for n in range(1, 10)):
+                            cleaned_lines.append('')
+
+                # Handle paragraphs - ensure proper spacing
+                elif line.strip():
+                    # If this is a regular paragraph line
+                    if i > 0 and cleaned_lines and cleaned_lines[-1].strip():
+                        # Check if previous line is also a paragraph (not heading, list, or blank)
+                        prev_line = cleaned_lines[-1].strip()
+                        if (prev_line and
+                            not prev_line.startswith(('#', '-', '*', '+')) and
+                            not any(prev_line.startswith(f'{n}.') for n in range(1, 10)) and
+                            not re.match(r'^\s*$', prev_line)):
+                            # Add blank line between paragraphs if they're consecutive
+                            cleaned_lines.append('')
+
+                cleaned_lines.append(line)
+
+            # Join back and clean up excessive blank lines
+            result = '\n'.join(cleaned_lines)
+
+            # Remove excessive consecutive blank lines (more than 2)
+            result = re.sub(r'\n{3,}', '\n\n', result)
+
+            # Ensure content ends with proper spacing
+            if result and not result.endswith('\n'):
+                result += '\n'
+
+            return result
+
+        def search_web(query, max_results=5):
+            with DDGS() as ddgs:
+                return [r['href'] for r in ddgs.text(query, max_results=max_results, safesearch="on", backend="google,brave")]
+
+        def scrape_page(url):
+            try:
+                html = requests.get(url, timeout=5).text
+                soup = BeautifulSoup(html, "html.parser")
+                return " ".join([p.get_text() for p in soup.find_all("p")])[:3000]  # limit size
+            except:
+                return ""
+
+        def summarize_streaming(text, prompt="Summarize:", model="gemma3n"):
+            """Generator that yields chunks of the summary as they are received"""
+            stream = client.chat.completions.create(
+                model=model,  # use whatever name your server registered
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": text}
+                ],
+                max_tokens=4500,
+                stream=True
+            )
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
+
+        # Format the search queries with product and region
+        formatted_query1 = search_query1.format(product=product, region=region)
+        formatted_query2 = search_query2.format(product=product, region=region)
+        
+        async def generate_stream():
+            # Send initial status
+            yield f"data: {json.dumps({'type': 'status', 'message': f'Running search: {formatted_query1}'})}\n\n"
+            
+            # Run the first query
+            urls = search_web(formatted_query1)
+            if not urls:
+                yield f"data: {json.dumps({'type': 'status', 'message': 'No results found for first query'})}\n\n"
+            else:
+                sources = []
+                all_content = []
+                
+                for i, url in enumerate(urls, 1):
+                    try:
+                        scraped = scrape_page(url)
+                        if scraped:
+                            all_content.append(scraped)
+                            sources.append({
+                                'url': url,
+                                'title': f'Article {i}'
+                            })
+                    except Exception as e:
+                        print(f"Error processing {url}: {str(e)}")
+                
+                if all_content:
+                    combined_text = "\n---\n".join(all_content)
+                    
+                    # Send status that we're starting to generate summary
+                    yield f"data: {json.dumps({'type': 'status', 'message': 'Generating summary...'})}\n\n"
+                    
+                    # Stream the summary content
+                    full_summary = ""
+                    yield f"data: {json.dumps({'type': 'start_summary', 'sources': sources})}\n\n"
+                    
+                    for chunk in summarize_streaming(
+                        combined_text,
+                        prompt=(
+                            f"You are a {role}. Give your reply in concise 100 words and 3 bullet points to {objective} "
+                            f"The current forecast within Stryker is giving CAGR of 0%. "  # Using 0% as placeholder since we don't have the growth data
+                            "Your main task is to look into the web articles provided by user and compare CAGR of Stryker with CAGR forecasts done in these articles. "
+                            """Always remember below important points while replying: 
+                                - Do not output disclaimer
+                                - Do not start with Okay
+                                - Be direct and to the point
+                                - Do not ask user question
+                                - Do not output more than 200 words
+                                """
+                        ),
+                        model="gemma3n"  # Changed from qwen-thinking since that model might not be available
+                    ):
+                        full_summary += chunk
+                        
+                        # Send the chunk as-is without extra processing
+                        yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+                        
+                        # Small delay to allow proper streaming
+                        await asyncio.sleep(0.01)
+                    
+                    # Send completion signal with full content
+                    cleaned_summary = clean_markdown_content(full_summary)
+                    yield f"data: {json.dumps({'type': 'complete', 'content': cleaned_summary, 'sources': sources})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'status', 'message': 'No content found from the sources.'})}\n\n"
+
+        return StreamingResponse(generate_stream(), media_type="text/plain")
+    except Exception as e:
+        print(f"Error in run_agent_stream_api: {e}")
+        import traceback
+        traceback.print_exc()
+        # Send error as a data event
+        async def error_stream():
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        return StreamingResponse(error_stream(), media_type="text/plain")

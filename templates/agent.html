@@ -78,8 +78,8 @@
                 <div class="bg-gray-50 rounded-lg shadow p-4 h-full flex flex-col">
                     <h3 class="text-lg font-semibold mb-3">Agent Output</h3>
                     <div 
-                        id="output-area" 
-                        class="bg-white rounded border p-4 flex-grow overflow-y-auto mb-3 min-h-96"
+                        id="output-area"
+                        class="bg-white rounded border p-4 flex-grow overflow-y-auto mb-3 min-h-96 prose prose-sm sm:prose-base lg:prose-lg text-gray-900"
                         x-html="outputHtml"
                     ></div>
                     
@@ -158,6 +158,9 @@
             outputHtml: '',
             isSearching: false,
             showConfig: false,
+            showSources: false, // New property for collapsible sources
+            sources: [], // Store sources data
+            contentBuffer: '', // Buffer to accumulate tokens
             
             // Configuration
             searchQuery1: '{product} medical device category market growth potential for next 5 years in {region}',
@@ -207,7 +210,7 @@
                 this.outputHtml = '<div class="flex justify-center items-center"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div><span class="ml-2">Running agent...</span></div>';
                 
                 try {
-                    const response = await fetch('/api/agent', {
+                    const response = await fetch('/api/agent-stream', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -222,18 +225,162 @@
                         })
                     });
                     
-                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
                     
-                    if (data.success) {
-                        this.outputHtml = data.result;
-                    } else {
-                        this.outputHtml = `<div class="text-red-600">Error: ${data.error || 'Unknown error'}</div>`;
+                    // Clear the output area to prepare for streaming
+                    this.outputHtml = '';
+                    this.sources = []; // Reset sources
+                    this.showSources = false; // Hide sources initially
+                    this.showDetails = false; // For <details> content
+                    //this.contentBuffer = '';
+                    
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+                    
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        
+                        if (done) {
+                            break;
+                        }
+                        
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop(); // Keep last partial line in buffer
+                        
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
+                                    
+                                    if (data.type === 'status') {
+                                        // Update status message
+                                        this.outputHtml = `<div class="text-blue-600">${data.message}</div>`;
+                                    } else if (data.type === 'start_summary') {
+                                        // Show sources first if available
+                                        if (data.sources && data.sources.length > 0) {
+                                            this.sources = data.sources;
+                                            let sourcesHtml = `
+                                                <div class="mb-4">
+                                                    <div class="flex items-center justify-between">
+                                                        <h4 class="font-semibold">Sources:</h4>
+                                                        <button 
+                                                            @click="showSources = !showSources"
+                                                            class="text-sm text-blue-600 hover:underline"
+                                                            x-text="showSources ? 'Hide Sources' : 'Show Sources'"
+                                                        ></button>
+                                                    </div>
+                                                    <div x-show="showSources" class="bg-gray-100 rounded p-3 mt-2 transition-all duration-300">
+                                                        <ul class="list-disc pl-5 space-y-1">
+                                            `;
+                                            data.sources.forEach((source, index) => {
+                                                sourcesHtml += `<li><a href="${source.url}" target="_blank" class="text-blue-600 hover:underline">${source.url}</a></li>`;
+                                            });
+                                            sourcesHtml += `
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                                <div id="streaming-content" class="prose max-w-none"></div>
+                                            `;
+                                            this.outputHtml = sourcesHtml;
+                                        } else {
+                                            // If no sources, just start with streaming content
+                                            this.outputHtml = '<div id="streaming-content" class="prose max-w-none"></div>';
+                                        }
+                                    } else if (data.type === 'chunk') {
+                                        // Append the new chunk to the content buffer
+                                        this.contentBuffer += data.content;
+                                        
+                                        // Process the accumulated content and update the display
+                                        const streamingDiv = document.getElementById('streaming-content');
+                                        if (streamingDiv) {
+                                            // Simple text processing - just escape HTML and handle basic formatting
+                                            const processedContent = this.processContent(this.contentBuffer);
+                                            streamingDiv.innerHTML = processedContent;
+                                            
+                                            // Scroll to bottom to see new content
+                                            streamingDiv.parentElement.scrollTop = streamingDiv.parentElement.scrollHeight;
+                                        }
+                                    } else if (data.type === 'complete') {
+                                        // Processing is complete - just process any potential details elements that need formatting
+                                        const streamingDiv = document.getElementById('streaming-content');
+                                        if (streamingDiv) {
+                                            this.processDetailsElements();
+                                        }
+                                    } else if (data.type === 'error') {
+                                        this.outputHtml = `<div class="text-red-600">Error: ${data.message}</div>`;
+                                    }
+                                } catch (e) {
+                                    // Ignore malformed JSON lines
+                                    console.warn('Could not parse SSE data:', line);
+                                }
+                            }
+                        }
                     }
                 } catch (error) {
                     this.outputHtml = `<div class="text-red-600">Error: ${error.message}</div>`;
                 } finally {
                     this.isSearching = false;
                 }
+            },
+            
+            // Escape HTML to prevent XSS
+            escapeHtml: function(text) {
+                return text
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            },
+            
+            // Simple content processor that only handles basic formatting
+            processContent: function(text) {
+                if (!text) return '';
+                
+                // First, escape HTML to prevent XSS
+                let content = this.escapeHtml(text);
+                
+                // Convert newlines to <br> tags for proper line breaks
+                content = content.replace(/\n/g, '<br>');
+                
+                // Handle bold text
+                content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                
+                // Handle italic text
+                content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                
+                return content;
+            },
+            
+            // Process any <details> and <summary> elements to make them collapsible
+            processDetailsElements: function() {
+                const detailsElements = document.querySelectorAll('details');
+                detailsElements.forEach((details, index) => {
+                    if (!details.hasAttribute('data-processed')) {
+                        details.setAttribute('data-processed', 'true');
+                        details.classList.add('bg-gray-100', 'rounded', 'p-3', 'mt-2', 'mb-2');
+                        
+                        const summary = details.querySelector('summary');
+                        if (summary) {
+                            summary.classList.add('font-semibold', 'cursor-pointer', 'list-none');
+                            summary.style.listStyle = 'none';
+                            
+                            // Add custom indicator for expand/collapse
+                            summary.insertAdjacentHTML('beforeend', '<span class="float-right ml-2">▼</span>');
+                            
+                            details.addEventListener('toggle', function() {
+                                const indicator = this.querySelector('summary span:last-child');
+                                if (indicator) {
+                                    indicator.textContent = this.open ? '▲' : '▼';
+                                }
+                            });
+                        }
+                    }
+                });
             },
             
             resetConfig() {
