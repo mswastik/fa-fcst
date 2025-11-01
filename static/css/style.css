@@ -153,7 +153,6 @@ input:focus, select:focus, textarea:focus {
     display: grid;
     grid-template-columns: 200px 200px 1fr;
     max-height: 99dvh;
-
 }
 
 .sidebar {

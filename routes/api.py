@@ -143,14 +143,6 @@ async def update_dashboard(request: Request):
     session = state_service.get_or_create_session(session_id)
     
     # Get current filter state from form data
-    '''
-    filter_state = FilterState(
-        location1=str(form_data.get('location1', 'Region')) if form_data.get('location1') else 'Region',
-        location2=str(form_data.get('location2', '')) if form_data.get('location2') else '',
-        product1=str(form_data.get('product1', 'Franchise')) if form_data.get('product1') else 'Franchise',
-        product2=str(form_data.get('product2', '')) if form_data.get('product2') else ''
-    )
-    '''
     filter_state = FilterState(
     location1=str(form_data.get('location1', 'Region')) if form_data.get('location1') else 'Region',
     location2=str(form_data.get('location2', '')) if form_data.get('location2') else '',
@@ -275,72 +267,16 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
         
         line_chart_script = f"""
         <script>
-            document.addEventListener('DOMContentLoaded', function() {{
-                setTimeout(() => {{
-                    const lineCanvas = document.getElementById('line-chart-canvas');
-                    if (lineCanvas && typeof Chart !== 'undefined') {{
-                        if (lineCanvas.chart) {{
-                            lineCanvas.chart.destroy();
-                        }}
-                        lineCanvas.chart = new Chart(lineCanvas, {{
-                            type: 'line',
-                            data: {{
-                                labels: {json.dumps(categories_json)},
-                                datasets: [
-                                    {{
-                                        label: 'Actual',
-                                        data: {json.dumps(values_json)},
-                                        borderColor: 'var(--brand-blue)',
-                                        backgroundColor: 'rgba(var(--brand-blue-rgb), 0.2)',
-                                        tension: 0.1,
-                                        pointRadius: 3
-                                    }}
-                                    {", {{" +
-                                      f"    label: 'Forecast',\n" +
-                                      f"    data: {json.dumps(forecast_values_json)},\n" +
-                                      f"    borderColor: 'var(--brand-gold)',\n" +
-                                      f"    backgroundColor: 'rgba(var(--brand-gold-rgb), 0.2)',\n" +
-                                      f"    borderDash: [5, 5],\n" +
-                                      f"    tension: 0.1,\n" +
-                                      f"    pointRadius: 3\n" +
-                                      f"  }}" if forecast_values_json else ""}
-                                ]
-                            }},
-                            options: {{
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {{
-                                    title: {{
-                                        display: true,
-                                        text: 'Trend Chart'
-                                    }},
-                                    legend: {{
-                                        display: true,
-                                        position: 'top'
-                                    }}
-                                }},
-                                scales: {{
-                                    y: {{
-                                        beginAtZero: false
-                                    }},
-                                    x: {{
-                                        display: true,
-                                        title: {{
-                                            display: true,
-                                            text: 'Time'
-                                        }}
-                                    }}
-                                }}
-                            }}
-                        }});
-                    }}
-                }}, 100); // Small delay to ensure canvas is in DOM
-            }});
-            
-            // Re-initialize chart when HTMX finishes swapping content
-            document.addEventListener('htmx:afterSettle', function(evt) {{
+            // Function to initialize or re-initialize the line chart
+            function initLineChart() {{
                 const lineCanvas = document.getElementById('line-chart-canvas');
-                if (lineCanvas && typeof Chart !== 'undefined' && !lineCanvas.chart) {{
+                if (lineCanvas && typeof Chart !== 'undefined') {{
+                    // Destroy existing chart if it exists
+                    if (lineCanvas.chart) {{
+                        lineCanvas.chart.destroy();
+                    }}
+                    
+                    // Create new chart instance
                     lineCanvas.chart = new Chart(lineCanvas, {{
                         type: 'line',
                         data: {{
@@ -393,6 +329,27 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                         }}
                     }});
                 }}
+            }}
+            
+            // Initialize chart on DOM load if canvas exists
+            if (document.getElementById('line-chart-canvas')) {{
+                // If document is already loaded, initialize immediately
+                if (document.readyState === 'loading') {{
+                    document.addEventListener('DOMContentLoaded', initLineChart);
+                }} else {{
+                    // Small delay to ensure canvas is in DOM
+                    setTimeout(initLineChart, 100);
+                }}
+            }}
+            
+            // Re-initialize chart when HTMX finishes swapping content
+            document.addEventListener('htmx:afterSettle', function(evt) {{
+                // Check if the event target contains our chart or is our chart
+                if (evt.target.contains(document.getElementById('line-chart-canvas')) || 
+                    evt.target.id === 'line-chart-canvas' ||
+                    evt.target.id === 'dashboard-content') {{
+                    setTimeout(initLineChart, 50); // Small delay to ensure DOM is updated
+                }}
             }});
         </script>
         """
@@ -428,54 +385,16 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
         
         column_chart_script = f"""
         <script>
-            document.addEventListener('DOMContentLoaded', function() {{
-                setTimeout(() => {{
-                    const columnCanvas = document.getElementById('column-chart-canvas');
-                    if (columnCanvas && typeof Chart !== 'undefined') {{
-                        if (columnCanvas.chart) {{
-                            columnCanvas.chart.destroy();
-                        }}
-                        columnCanvas.chart = new Chart(columnCanvas, {{
-                            type: 'bar',
-                            data: {{
-                                labels: {json.dumps(months)},
-                                datasets: {json.dumps(datasets)}
-                            }},
-                            options: {{
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {{
-                                    title: {{
-                                        display: true,
-                                        text: 'Seasonality Chart'
-                                    }},
-                                    legend: {{
-                                        display: true,
-                                        position: 'top'
-                                    }}
-                                }},
-                                scales: {{
-                                    y: {{
-                                        beginAtZero: true
-                                    }},
-                                    x: {{
-                                        display: true,
-                                        title: {{
-                                            display: true,
-                                            text: 'Months'
-                                        }}
-                                    }}
-                                }}
-                            }}
-                        }});
-                    }}
-                }}, 100); // Small delay to ensure canvas is in DOM
-            }});
-            
-            // Re-initialize chart when HTMX finishes swapping content
-            document.addEventListener('htmx:afterSettle', function(evt) {{
+            // Function to initialize or re-initialize the column chart
+            function initColumnChart() {{
                 const columnCanvas = document.getElementById('column-chart-canvas');
-                if (columnCanvas && typeof Chart !== 'undefined' && !columnCanvas.chart) {{
+                if (columnCanvas && typeof Chart !== 'undefined') {{
+                    // Destroy existing chart if it exists
+                    if (columnCanvas.chart) {{
+                        columnCanvas.chart.destroy();
+                    }}
+                    
+                    // Create new chart instance
                     columnCanvas.chart = new Chart(columnCanvas, {{
                         type: 'bar',
                         data: {{
@@ -510,29 +429,50 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                         }}
                     }});
                 }}
+            }}
+            
+            // Initialize chart on DOM load if canvas exists
+            if (document.getElementById('column-chart-canvas')) {{
+                // If document is already loaded, initialize immediately
+                if (document.readyState === 'loading') {{
+                    document.addEventListener('DOMContentLoaded', initColumnChart);
+                }} else {{
+                    // Small delay to ensure canvas is in DOM
+                    setTimeout(initColumnChart, 100);
+                }}
+            }}
+            
+            // Re-initialize chart when HTMX finishes swapping content
+            document.addEventListener('htmx:afterSettle', function(evt) {{
+                // Check if the event target contains our chart or is our chart
+                if (evt.target.contains(document.getElementById('column-chart-canvas')) || 
+                    evt.target.id === 'column-chart-canvas' ||
+                    evt.target.id === 'dashboard-content') {{
+                    setTimeout(initColumnChart, 50); // Small delay to ensure DOM is updated
+                }}
             }});
         </script>
         """
     
     return f"""
-    <div id="charts-container" class="flex flex-col lg:flex-row gap-4 mb-6">
-        <div id="column-chart" class="flex-1 border rounded p-4" style="min-height: 400px;">
+    <div id="charts-container" class="flex flex-col lg:flex-row gap-4 mb-6 w-full">
+        <div id="column-chart" class="flex-1 border rounded p-4" style="min-height: 400px; min-width: 0;">
             <div class="flex justify-between items-center mb-2">
                 <h3 class="font-bold">Seasonality</h3>
                 <span class="text-sm text-gray-600">Chart data loaded</span>
             </div>
             <div class="w-full" style="height: 350px;">
-                <canvas id="column-chart-canvas"></canvas>
+                <canvas id="column-chart-canvas" class="w-full"></canvas>
             </div>
             {column_chart_script}
         </div>
-        <div id="line-chart" class="flex-1 border rounded p-4" style="min-height: 400px;">
+        <div id="line-chart" class="flex-1 border rounded p-4" style="min-height: 400px; min-width: 0;">
             <div class="flex justify-between items-center mb-2">
                 <h3 class="font-bold">Trend</h3>
                 <span class="text-sm text-gray-600">Chart data loaded</span>
             </div>
             <div class="w-full" style="height: 350px;">
-                <canvas id="line-chart-canvas"></canvas>
+                <canvas id="line-chart-canvas" class="w-full"></canvas>
             </div>
             {line_chart_script}
         </div>

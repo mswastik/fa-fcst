@@ -1,10 +1,7 @@
 {% extends "base.html" %}
-
 {% block content %}
-<div class="w-full">
-    <div class="rounded-lg shadow p-6">
         <!-- The content from ui/data.html body and script -->
-            <div class="main-content">
+            <div class="main-content rounded-lg shadow p-0">
                 <div class="sidebar" id="sidebar-left">
                     <button class="sidebar-toggle-button" onclick="toggleSidebar('sidebar-left')"><span class="toggle-icon"><<</span></button>
                     <div class="field-group">
@@ -31,8 +28,6 @@
                         <div class="filter-controls">
                             <select id="filter-field" class="filter-select"><div></div></select>
                           <div style="display:grid;grid-template-columns: 1fr 1fr;gap: 4px;">
-                            <!-- <button class="btn small" onclick="applyFilter()">Apply Filter</button>
-                            <button class="btn small danger" onclick="clearFilters()">Clear Filters</button> -->
                           </div>
                         </div>
                         <div id="active-filters" class="active-filters"></div>
@@ -237,7 +232,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
         
         <script>
@@ -2114,5 +2108,4 @@
             });
         </script>
     </div>
-</div>
 {% endblock %}
