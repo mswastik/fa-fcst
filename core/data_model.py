@@ -18,9 +18,6 @@ def get_filtered_products():
 def get_filtered_models():
     return get_global_state().filtered_models
 
-def get_by_month():
-    return get_global_state().by_month
-
 # For backward compatibility, create module-level references (lazy)
 @property
 def df():
@@ -37,10 +34,6 @@ def filtered_products():
 @property
 def filtered_models():
     return get_global_state().filtered_models
-
-@property
-def by_month():
-    return get_global_state().by_month
 
 def initialize_data():
     """Initialize the application data"""

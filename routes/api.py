@@ -14,78 +14,13 @@ from typing import Optional
 from models.schemas import FilterRequest, UpdateRequest, ActionRequest, FilterState
 from services.state_service import state_service
 from services.data_service import data_service
+import core.data_service as core_data_service
 from services.filter_service import filter_service
 from core.utils import UIUtils, DatabaseUtils
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
-'''
-@router.post("/api/filters")
-async def update_filters(request: Request):
-    """Update filter options based on selection using the new FilterService"""
-    # Get form data since HTMX sends form data by default
-    form_data = await request.form()
-    session_id = request.session.get('session_id')
-    if not session_id:
-        session_id = f"session_{len(state_service.sessions) + 1}"
-        request.session['session_id'] = session_id
 
-    session = state_service.get_or_create_session(session_id)
-    
-    # Extract filter data from form - handle both string and file types
-    filter_name = str(form_data.get('filter_name', '')) if form_data.get('filter_name') else ''
-    
-    # Get current filter state from form data
-    filter_state = FilterState(
-        location1=str(form_data.get('location1', 'Region')) if form_data.get('location1') else 'Region',
-        location2=str(form_data.get('location2', '')) if form_data.get('location2') else '',
-        product1=str(form_data.get('product1', 'Franchise')) if form_data.get('product1') else 'Franchise',
-        product2=str(form_data.get('product2', '')) if form_data.get('product2') else ''
-    )
-    
-    # Update the specific filter value that triggered the request
-    if filter_name and hasattr(filter_state, filter_name):
-        value = str(form_data.get(filter_name, '')) if form_data.get(filter_name) else ''
-        setattr(filter_state, filter_name, value)
-    
-    # Get available filter combinations using the new FilterService
-    try:
-        available_options = filter_service.get_available_filter_combinations(filter_state)
-        
-        # Generate HTML for both select2 containers
-        locations_html = generate_filter_select_html(
-            available_options['location2_options'],
-            "location2",
-            filter_state.location1,
-            filter_state.location2 # Pass the current selected value
-        )
-        products_html = generate_filter_select_html(
-            available_options['product2_options'],
-            "product2",
-            filter_state.product1,
-            filter_state.product2 # Pass the current selected value
-        )
-        
-        # Return a single HTML fragment containing both updated containers
-        # HTMX will find the matching IDs and swap them
-        combined_html = f"""
-        <div id="location-select2-container" class="min-w-[160px] flex-1 max-w-[200px]">
-            {locations_html}
-        </div>
-        <div id="product-select2-container" class="min-w-[160px] flex-1 max-w-[250px]">
-            {products_html}
-        </div>
-        """
-        
-        return HTMLResponse(content=combined_html)
-            
-    except Exception as e:
-        print(f"Error in update_filters: {e}")
-        return JSONResponse({
-            "success": False,
-            "error": str(e)
-        }, status_code=500)
-'''
 @router.post("/api/filters", response_class=HTMLResponse)
 async def update_filters(
     request: Request,
@@ -137,84 +72,6 @@ async def update_filters(
         import traceback
         traceback.print_exc()
         return f'<div class="text-red-500">Error updating filters: {str(e)}</div>'
-
-'''
-@router.post("/api/update", response_class=HTMLResponse)
-async def update_dashboard(
-    request: Request,
-    location1: str = Form("Region"),
-    location2: Optional[str] = Form(None),
-    product1: str = Form("Franchise"),
-    product2: Optional[str] = Form(None)
-):
-    """
-    Handle changes to location2 or product2 dropdowns.
-    Fetch and return filtered data.
-    """
-    try:
-        # Check if all required filters are selected
-        if not location2 or not product2:
-            return """
-            <div id="charts-container">
-                <div class="flex justify-center items-center h-64">
-                    <div class="text-gray-500">Please select all filters to view data</div>
-                </div>
-            </div>
-            <div class="w-full h-full mt-6 p-0">
-                <h3 class="p-2 text-lg font-bold">Select Product and Model data</h3>
-                <div id="details-table">
-                    <div class="p-8 text-center text-gray-500">
-                        Please select all required filters to view data
-                    </div>
-                </div>
-            </div>
-            """
-        
-        # Create filter state
-        filter_state = FilterState(
-            location1=location1,
-            location2=location2,
-            product1=product1,
-            product2=product2
-        )
-        
-        # Get filtered data
-        data, metadata = filter_service.get_filtered_data(filter_state)
-        
-        if data is None or data.is_empty():
-            return f"""
-            <div id="charts-container">
-                <div class="flex justify-center items-center h-64">
-                    <div class="text-orange-500">No data found for selected filters</div>
-                </div>
-            </div>
-            <div class="w-full h-full mt-6 p-0">
-                <h3 class="p-2 text-lg font-bold">Select Product and Model data</h3>
-                <div id="details-table">
-                    <div class="p-8 text-center text-orange-500">
-                        No data available for {location1}: {location2}, {product1}: {product2}
-                    </div>
-                </div>
-            </div>
-            """
-        
-        # Return dashboard content with data
-        return templates.TemplateResponse(
-            "partials/dashboard_content.html",
-            {
-                "request": request,
-                "data": data.to_dicts(),
-                "metadata": metadata,
-                "filter_state": filter_state
-            }
-        )
-        
-    except Exception as e:
-        print(f"Error in update_dashboard: {e}")
-        import traceback
-        traceback.print_exc()
-        return f'<div class="text-red-500">Error loading data: {str(e)}</div>'
-'''
 
 def generate_filter_select_html(options: List[str], name: str, current_type: str = "", selected_value: str = "") -> str:
     """Generate HTML for a filter select dropdown"""
@@ -815,7 +672,7 @@ async def handle_action(request: Request):
             
             # Import clustering function
             from core.data_service import create_enhanced_clusters
-            result_df = create_enhanced_clusters(df, "", session)
+            result_df = create_enhanced_clusters(df, session)
             
             # Update session with clustered data
             session.df = result_df
@@ -850,8 +707,9 @@ async def handle_action(request: Request):
         
         elif action == "forecast":
             # Check if filters are set
-            if not (filter_state.location2 and filter_state.location1 and
-                    filter_state.product2 and filter_state.product1):
+            # Check if both location and product filters have a selected value
+            if not (filter_state.location1 and filter_state.location2 and filter_state.location2.strip() and
+                    filter_state.product1 and filter_state.product2 and filter_state.product2.strip()):
                 html = """
                 <div class="p-4 text-center text-red-500">
                     Please set both location and product filters before generating forecasts.
@@ -879,7 +737,7 @@ async def handle_action(request: Request):
                 return HTMLResponse(content=html)
             
             # Run forecasting
-            result_df = data_service.create_models(filtered_df)
+            result_df = core_data_service.create_models_action(filtered_df, session)
             
             # Update session with forecasted data
             session.df = result_df

@@ -89,7 +89,10 @@
         <button 
             class="btn px-4 py-2 rounded"
             hx-post="/api/actions"
-            hx-vals="js:{action: 'segmentation', filter_state: getFilterState()}"
+            hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
+            hx-vals="js:{action: 'segmentation'}"
+            hx-target="#dashboard-content"
+            hx-swap="innerHTML"
             hx-indicator=".htmx-indicator"
         >
             Segmentation
@@ -97,7 +100,10 @@
         <button 
             class="btn px-4 py-2 rounded"
             hx-post="/api/actions"
-            hx-vals="js:{action: 'forecast', filter_state: getFilterState()}"
+            hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
+            hx-vals="js:{action: 'forecast'}"
+            hx-target="#dashboard-content"
+            hx-swap="innerHTML"
             hx-indicator=".htmx-indicator"
         >
             Generate Forecast
@@ -105,7 +111,10 @@
         <button 
             class="btn secondary px-4 py-2 rounded"
             hx-post="/api/actions"
-            hx-vals="js:{action: 'validate', filter_state: getFilterState()}"
+            hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
+            hx-vals="js:{action: 'validate'}"
+            hx-target="#dashboard-content"
+            hx-swap="innerHTML"
             hx-indicator=".htmx-indicator"
         >
             Validate Models
@@ -113,7 +122,10 @@
         <button 
             class="btn px-4 py-2 rounded"
             hx-post="/api/actions"
-            hx-vals="js:{action: 'change_fc', filter_state: getFilterState()}"
+            hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
+            hx-vals="js:{action: 'change_fc'}"
+            hx-target="#dashboard-content"
+            hx-swap="innerHTML"
             hx-indicator=".htmx-indicator"
         >
             Change FC
@@ -121,7 +133,10 @@
         <button 
             class="btn px-4 py-2 rounded"
             hx-post="/api/actions"
-            hx-vals="js:{action: 'view', filter_state: getFilterState()}"
+            hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
+            hx-vals="js:{action: 'view'}"
+            hx-target="#dashboard-content"
+            hx-swap="innerHTML"
             hx-indicator=".htmx-indicator"
         >
             View
@@ -150,16 +165,6 @@
 </div>
 
 <script>
-    // Function to collect current filter state
-    function getFilterState() {
-        return {
-            location1: document.querySelector('[name="location1"]').value,
-            location2: document.querySelector('[name="location2"]').value,
-            product1: document.querySelector('[name="product1"]').value,
-            product2: document.querySelector('[name="product2"]').value
-        };
-    }
-    
     // Initialize TomSelect for searchable dropdowns
     function initSearchableSelects() {
         const selects = document.querySelectorAll('select.tom-select');

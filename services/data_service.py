@@ -46,10 +46,10 @@ class DataService:
         return apply_filters(filters)
     
     @staticmethod
-    def create_models(df: pl.DataFrame, file_path: str = "") -> pl.DataFrame:
+    def create_models(df: pl.DataFrame) -> pl.DataFrame:
         """Create forecasting models"""
         # This calls the existing create_models_action function
-        return create_models_action(df, file_path)
+        return create_models_action(df)
     
     @staticmethod
     def change_fc() -> str:

@@ -133,7 +133,7 @@ def optimize_clusters(features_df, max_clusters=10):
     
     return best_k, best_score
 
-def create_enhanced_clusters(df: pl.DataFrame, file_path: str, state: DataState = None) -> pl.DataFrame:
+def create_enhanced_clusters(df: pl.DataFrame, state: DataState = None) -> pl.DataFrame:
     """Enhanced clustering with proper feature engineering"""
     if state is None:
         state = get_global_state()
@@ -329,15 +329,18 @@ def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFram
             return pl.DataFrame()
         
         # Rename forecast column to match expected format
-        if 'rf' in forecasts_pl.columns:
-            forecasts_pl = forecasts_pl.rename({'rf': 'Fcst Ensemble Rev'})
+        # The chart logic in state_manager.py expects 'NHITS' for forecast values
+        if 'ensemble' in forecasts_pl.columns:
+            forecasts_pl = forecasts_pl.rename({'ensemble': 'NHITS'})
+        elif 'rf' in forecasts_pl.columns:
+            forecasts_pl = forecasts_pl.rename({'rf': 'NHITS'})
         elif 'xgb' in forecasts_pl.columns:
-            forecasts_pl = forecasts_pl.rename({'xgb': 'Fcst Ensemble Rev'})
+            forecasts_pl = forecasts_pl.rename({'xgb': 'NHITS'})
         else:
-            # Use the first available forecast column
+            # Use the first available forecast column and rename it to 'NHITS'
             forecast_cols = [col for col in forecasts_pl.columns if col not in ['unique_id', 'ds', 'y']]
             if forecast_cols:
-                forecasts_pl = forecasts_pl.rename({forecast_cols[0]: 'Fcst Ensemble Rev'})
+                forecasts_pl = forecasts_pl.rename({forecast_cols[0]: 'NHITS'})
         
         # Ensure proper column names for database integration
         if 'ds' in forecasts_pl.columns:
@@ -352,12 +355,11 @@ def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFram
         return pl.DataFrame()
 
 
-def run_mlforecast_pipeline(df: pl.DataFrame, file_path: str, state: DataState = None) -> Tuple[Optional[pl.DataFrame], Dict[str, Any]]:
+def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None) -> Tuple[Optional[pl.DataFrame], Dict[str, Any]]:
     """Run the forecasting pipeline using MLForecast and save results to database
     
     Args:
         df: Polars DataFrame with sales data
-        file_path: Path to the data file (for reference)
         state: Optional DataState instance
         
     Returns:
@@ -463,14 +465,14 @@ def run_mlforecast_pipeline(df: pl.DataFrame, file_path: str, state: DataState =
         return df, {'error': str(e), 'forecasts_generated': 0, 'forecasts_saved': 0}
 
 
-def create_models_action(df: pl.DataFrame, file_path: str, state: DataState = None) -> pl.DataFrame:
+def create_models_action(df: pl.DataFrame, state: DataState = None) -> pl.DataFrame:
     """Business logic for creating forecasting models using MLForecast"""
     if state is None:
         state = get_global_state()
     
     try:
         # Run the MLForecast pipeline
-        result_df, validation_results = run_mlforecast_pipeline(df, file_path, state)
+        result_df, validation_results = run_mlforecast_pipeline(df, state)
         
         # Ensure original column structure is preserved for UI compatibility
         if result_df is not None and not result_df.is_empty():
