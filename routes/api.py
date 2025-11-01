@@ -1156,9 +1156,27 @@ async def run_agent_stream_api(request: Request):
                 if delta:
                     yield delta
 
-        # Format the search queries with product and region
-        formatted_query1 = search_query1.format(product=product, region=region)
-        formatted_query2 = search_query2.format(product=product, region=region)
+        # Format the search queries with product and region - with safety checks
+        print(f"Received product: '{product}', region: '{region}'")
+        print(f"Original search query 1: '{search_query1}', search query 2: '{search_query2}'")
+        
+        # Safe formatting - replace placeholders with actual values, use fallback if needed
+        try:
+            formatted_query1 = search_query1.format(product=product, region=region)
+        except KeyError as e:
+            print(f"KeyError in search_query1 formatting: {e}")
+            # Fallback to simple replacement
+            formatted_query1 = search_query1.replace('{product}', str(product)).replace('{region}', str(region))
+        
+        try:
+            formatted_query2 = search_query2.format(product=product, region=region)
+        except KeyError as e:
+            print(f"KeyError in search_query2 formatting: {e}")
+            # Fallback to simple replacement
+            formatted_query2 = search_query2.replace('{product}', str(product)).replace('{region}', str(region))
+        
+        print(f"Formatted query 1: '{formatted_query1}'")
+        print(f"Formatted query 2: '{formatted_query2}'")
         
         async def generate_stream():
             # Send initial status
