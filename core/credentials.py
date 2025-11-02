@@ -87,29 +87,3 @@ class CredentialsManager:
                 
         except Exception as e:
             print(f"Error saving credentials: {e}")
-
-
-def get_credentials_manager() -> CredentialsManager:
-    """Get the global credentials manager instance."""
-    return CredentialsManager()
-
-
-def get_database_credentials() -> Dict[str, str]:
-    """Get database credentials with proper fallback chain."""
-    manager = get_credentials_manager()
-    creds = manager.get_database_credentials()
-    
-    # Ensure we have defaults for all required fields
-    defaults = {
-        'server': 'gda-globalsynapseanalytics-ws-prod.sql.azuresynapse.net',
-        'database_name': 'gda_glbsyndb',
-        'username': 'Envisionread',
-        'password': 'Env!s$@*on'
-    }
-    
-    # Fill in any missing values with defaults
-    for key, default_value in defaults.items():
-        if not creds.get(key):
-            creds[key] = os.getenv(f"DB_{key.upper()}", os.getenv(key.upper(), default_value))
-    
-    return creds
