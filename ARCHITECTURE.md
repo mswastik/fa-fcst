@@ -8,7 +8,7 @@ This diagram shows the main components and their interactions, highlighting the 
 
 ```mermaid
 graph TD
-    subgraph Frontend (NiceGUI/HTMX)
+    subgraph Frontend (HTMX/JavaScript)
         A[User Interface] -- Filter/Action --> B(FastAPI Routes)
         B -- HTML/Data --> A
     end
@@ -36,8 +36,6 @@ graph TD
         D -- Validation --> M(Model Validator)
     end
 
-    A -- Authentication --> N(Auth Service)
-    N -- Auth Check --> B
     D -- Read/Write --> I
 
     style Frontend fill:#f9f,stroke:#333,stroke-width:2px
@@ -56,8 +54,8 @@ graph TD
     A[app.py] --> B(routes/)
     B --> C(core/state_manager.py)
     B --> D(core/db_service.py)
-    B --> E(ui/components.py)
-    B --> F(ui/charts.py)
+    B --> E(templates/)
+    B --> F(static/)
 
     C --> D
     C --> G(core/data_service.py)
@@ -74,7 +72,6 @@ graph TD
 
     E --> C
     E --> G
-    E --> F
 
     K --> D
     L --> K
@@ -88,7 +85,7 @@ This sequence diagram details the steps involved when a user triggers a forecast
 
 ```mermaid
 sequenceDiagram
-    participant UI as NiceGUI Dashboard
+    participant UI as HTMX Dashboard
     participant API as FastAPI /api/actions
     participant State as DataState
     participant DB as DatabaseService

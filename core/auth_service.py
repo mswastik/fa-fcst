@@ -1,20 +1,18 @@
 """
 Authentication service for Microsoft OAuth2 SSO.
 NOTE: This service is currently not integrated into the main FastAPI application.
-It was originally designed for NiceGUI but this is a FastAPI app, so it's unused.
+It is not currently integrated into the main FastAPI application.
 """
 import os
 from fastapi import Request
 from fastapi.responses import RedirectResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 from authlib.integrations.starlette_client import OAuth
 
 
 class AuthService:
     """Handles Microsoft OAuth2 authentication"""
     
-    # NOTE: This service uses NiceGUI app.storage.user which won't work in FastAPI
-    # This entire service is not used in the current FastAPI application
+    # NOTE: This service is not used in the current FastAPI application.
 
     def __init__(self, app_instance=None):
         self.oauth = OAuth()
@@ -36,19 +34,15 @@ class AuthService:
         )
 
     def is_authenticated(self, request: Request) -> bool:
-        """Check if user is authenticated"""
-        # This uses NiceGUI storage which doesn't exist in FastAPI
-        # Service is not used in current application
+        """Check if user is authenticated (Placeholder)"""
         return False
 
     def get_user_info(self):
-        """Get current user information"""
-        # Service is not used in current application
+        """Get current user information (Placeholder)"""
         return {}
 
     def logout(self):
-        """Clear user session"""
-        # Service is not used in current application
+        """Clear user session (Placeholder)"""
         pass
 
     async def initiate_login(self, request: Request):
@@ -66,38 +60,12 @@ class AuthService:
             )
             user_info = user_info_response.json()
 
-            # Store user information in session
-            # NOTE: This uses NiceGUI storage which doesn't exist in FastAPI
-            # Service is not used in current application
+            # NOTE: Session management for FastAPI needs to be implemented here.
             return True, user_info
         except Exception as e:
             print(f"OAuth callback error: {e}")
             return False, str(e)
 
 
-class AuthMiddleware(BaseHTTPMiddleware):
-    """Middleware to protect routes with authentication"""
-    # This middleware is never used in app.py, so it's redundant
-
-    def __init__(self, app, exclude_paths=None):
-        super().__init__(app)
-        self.exclude_paths = exclude_paths or ['/login', '/auth', '/favicon.ico']
-
-    async def dispatch(self, request, call_next):
-        # Allow access to excluded paths
-        if request.url.path in self.exclude_paths:
-            return await call_next(request)
-
-        # Allow NiceGUI internal routes
-        if request.url.path.startswith('/_nicegui'):
-            return await call_next(request)
-
-        # Check authentication
-        # NOTE: auth_service.is_authenticated uses NiceGUI storage
-        # This middleware is not used in the current FastAPI application
-        return RedirectResponse(f'/login?redirect_to={request.url.path}')
-
-
 # Global auth service instance
-# This is never imported in app.py, so it's redundant
 auth_service = AuthService()

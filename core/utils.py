@@ -6,7 +6,6 @@ Centralizes frequently used patterns to reduce code duplication.
 import os
 from typing import Dict, Any, Optional
 import polars as pl
-from nicegui import ui
 from datetime import datetime
 from json import JSONEncoder
 
@@ -175,14 +174,12 @@ class ErrorHandler:
         """Handle UI update errors with consistent messaging."""
         error_msg = f"{operation} failed: {str(error)}"
         print(f"{operation} error: {error}")
-        UIUtils.show_error_message(error_msg)
 
     @staticmethod
     def handle_data_loading_error(error: Exception, operation: str = "Data loading"):
         """Handle data loading errors with consistent messaging."""
         error_msg = f"{operation} failed: {str(error)}"
         print(f"{operation} error: {error}")
-        UIUtils.show_error_message(error_msg)
 
 
 # Common filter options

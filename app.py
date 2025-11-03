@@ -13,8 +13,8 @@ from starlette.middleware.sessions import SessionMiddleware
 # Import existing modules
 from core.state_manager import DataState, get_global_state
 from core.data_service import apply_filters, create_models_action, change_fc_action
-from core.utils import DataUtils, UIUtils, ErrorHandler
-from ui.charts import render_column_chart, render_line_chart
+from core.utils import DataUtils, ErrorHandler
+#from ui.charts import render_column_chart, render_line_chart
 import polars as pl
 
 app = FastAPI(title="ML Integration Forecast Dashboard", version="1.0.0")
@@ -49,8 +49,6 @@ app.include_router(api.router)
 # Add a route for the agent page
 @app.get("/agent", response_class=HTMLResponse)
 async def agent_page(request: Request):
-    from fastapi.templating import Jinja2Templates
-    templates = Jinja2Templates(directory="templates")
     return templates.TemplateResponse("agent.html", {"request": request})
 
 @app.get("/", response_class=HTMLResponse)

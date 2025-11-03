@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from core.utils import DataUtils, ErrorHandler
 from core.db_service import get_database_service
-from nicegui import app
 
 
 @dataclass
@@ -66,7 +65,7 @@ class DataState:
             self.loading_data = loading
             self.loading_message_data = message
     
-    def is_loading(self, component: str = None) -> bool:
+    def is_loading(self, component: Optional[str] = None) -> bool:
         """Check if a component or any component is loading."""
         if component == 'charts':
             return self.loading_charts
@@ -95,12 +94,12 @@ class DataState:
         self.full_df = None
         self.filtered_df = None
     
-    def load_sample_data(self, path: str = None) -> pl.DataFrame:
+    def load_sample_data(self, path: Optional[str] = None) -> pl.DataFrame:
         """Load sample data from DuckDB database."""
         try:
             db_service = get_database_service()
             if db_service is None:
-                return None
+                return pl.DataFrame()
 
             # Load sales actuals with joined hierarchy data
             self.df = db_service.get_sales_actuals()
@@ -115,10 +114,10 @@ class DataState:
             ErrorHandler.handle_data_loading_error(e, "Sample data loading")
             raise ValueError(f"Failed to load data from database: {e}")
     
-    def get_filter_options(self, prod: str = None, loc: str = None) -> Dict[str, Any]:
+    def get_filter_options(self, prod: Optional[str] = None, loc: Optional[str] = None) -> Dict[str, Any]:
         """Return filter options for UI dropdowns."""
-        prod = prod or self.products[0]
-        loc = loc or self.locations[0]
+        prod = prod or (self.products[0] if self.products else None)
+        loc = loc or (self.locations[0] if self.locations else None)
         
         try:
             if self.df is not None and len(self.df) > 0:
@@ -129,14 +128,14 @@ class DataState:
                     # Try to find the column with a different case or format
                     products_filt = []
                     for col in self.df.columns:
-                        if col.lower().replace(' ', '_') == prod.lower().replace(' ', '_'):
+                        if prod is not None and col.lower().replace(' ', '_') == prod.lower().replace(' ', '_'):
                             products_filt = [x for x in self.df[col].unique().to_list() if x is not None]
                             break
                     
                     # Debug: Print available columns to help identify the issue
                     if not products_filt:
                         print(f"Product column '{prod}' not found. Available columns: {self.df.columns}")
-                        print(f"Looking for pattern: {prod.lower().replace(' ', '_')}")
+                        print(f"Looking for pattern: {prod.lower().replace(' ', '_') if prod else 'None'}")
                 
                 if loc in self.df.columns:
                     locations_filt = self.df[loc].unique().to_list()
@@ -144,7 +143,7 @@ class DataState:
                     # Try to find the column with a different case or format
                     locations_filt = []
                     for col in self.df.columns:
-                        if col.lower().replace(' ', '_') == loc.lower().replace(' ', '_'):
+                        if loc is not None and col.lower().replace(' ', '_') == loc.lower().replace(' ', '_'):
                             locations_filt = self.df[col].unique().to_list()
                             break
                 
@@ -345,9 +344,9 @@ class DataState:
             for month in month_order:
                 month_row = year_data.filter(pl.col('Month') == month)
                 if len(month_row) > 0:
-                    actual_values.append(month_row['Act Orders Rev'][0])
+                    actual_values.append(month_row['Act Orders Rev'][0] if len(month_row) > 0 else None)
                     forecast_values.append(
-                        month_row['NHITS'][0] if 'NHITS' in month_row.columns else None
+                        month_row['NHITS'][0] if 'NHITS' in month_row.columns and len(month_row) > 0 else None
                     )
                 else:
                     actual_values.append(None)
@@ -396,35 +395,22 @@ class DataState:
         }
 
 
-# Lazy state management using NiceGUI app.storage for proper multi-session support
+# Global state management for FastAPI (using a simple global variable for now)
+_global_state: Optional[DataState] = None
+
 def get_global_state() -> DataState:
-    """Get the client-specific state instance using app.storage.client (lazy access)."""
-    # This can only be called within page builder functions, not during import
-    try:
-        # Use client storage for per-browser-tab isolation
-        if 'fcst_state' not in app.storage.client:
-            app.storage.client['fcst_state'] = DataState()
-        return app.storage.client['fcst_state']
-    except RuntimeError:
-        # If called outside of page context, return a temporary global instance
-        # This should only happen during import/initialization
-        global _temp_state
-        if '_temp_state' not in globals():
-            _temp_state = DataState()
-        return _temp_state
+    """Get the global state instance."""
+    global _global_state
+    if _global_state is None:
+        _global_state = DataState()
+    return _global_state
 
 def initialize_global_state() -> None:
-    """Initialize the client-specific session state (only works within page context)."""
-    try:
-        if 'fcst_state' not in app.storage.client:
-            app.storage.client['fcst_state'] = DataState()
-        app.storage.client['fcst_state'].initialize_data()
-    except RuntimeError:
-        # If called outside of page context, initialize temp state
-        global _temp_state
-        if '_temp_state' not in globals():
-            _temp_state = DataState()
-        _temp_state.initialize_data()
+    """Initialize the global state instance."""
+    global _global_state
+    if _global_state is None:
+        _global_state = DataState()
+    _global_state.initialize_data()
 
 
 class SessionManager:

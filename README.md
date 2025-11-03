@@ -62,8 +62,8 @@ This is a curated list of the most critical functions in the codebase:
 
 | Function | Module | Description |
 | :--- | :--- | :--- |
-| [`update_filters()`](routes/api.py:26) | `routes/api.py` | FastAPI endpoint to process filter changes and return updated UI components (HTMX). |
+| [`update_filters()`](routes/api.py:26) | `routes/api.py` | FastAPI endpoint to process filter changes and return updated UI fragments (HTMX). |
 | [`handle_action()`](routes/api.py:620) | `routes/api.py` | FastAPI endpoint to trigger long-running actions like Clustering, Model Creation, and Validation. |
 | [`run_agent_stream_api()`](routes/api.py:1077) | `routes/api.py` | FastAPI endpoint for the AI agent, providing a streaming response with web search and summarization capabilities. |
-| [`create_dashboard()`](ui/dashboard.py:94) | `ui/dashboard.py` | The main NiceGUI function that composes all UI components (filters, charts, tables). |
-| [`ActionButtons._run_create_models()`](ui/components.py:591) | `ui/components.py` | NiceGUI handler for the "Create Models" button, initiating the forecasting process. |
+| [`dashboard_route()`](routes/dashboard.py:25) | `routes/dashboard.py` | FastAPI route that serves the main dashboard HTML template. |
+| [`agent_route()`](routes/agent.py:11) | `routes/agent.py` | FastAPI route that serves the agent HTML template. |
