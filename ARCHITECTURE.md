@@ -27,11 +27,6 @@ graph TD
 
     subgraph DataLayer["Data Layer"]
         G -- SQL Query --> I[DuckDB Database]
-        
-    end
-
-    subgraph Database
-        J[Envision DB] -- Fetch Data --> I
     end
 
     subgraph ForecastingModule["Forecasting Module"]
@@ -42,11 +37,16 @@ graph TD
 
     D -- Read/Write --> I
 
-    style Frontend fill:#f9f,stroke:#333,stroke-width:2px
+    subgraph Database["Database"]
+        J[Envision DB] -- Fetch Data --> I
+    end
+
+    style Frontend fill:#aaf,stroke:#333,stroke-width:2px
     style Backend fill:#ccf,stroke:#333,stroke-width:2px
     style CoreServices fill:#ddf,stroke:#333,stroke-width:2px
     style ForecastingModule fill:#cfc,stroke:#333,stroke-width:2px
     style DataLayer fill:#ffc,stroke:#333,stroke-width:2px
+    style Database fill:#ffe,stroke:#333,stroke-width:2px
 ```
 
 ## 2. Module Dependency Diagram
