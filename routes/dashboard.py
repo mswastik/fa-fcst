@@ -12,8 +12,9 @@ import pandas as pd
 import numpy as np
 
 from models.schemas import FilterState
-from services.state_service import state_service
-from services.data_service import data_service
+from core.state_manager import state_service
+
+#from services.data_service import data_service
 from services.filter_service import filter_service # Import filter_service
 from core.utils import UIUtils, CustomJsonEncoder
 

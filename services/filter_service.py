@@ -10,8 +10,9 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 import json
 
-from core.utils import DatabaseUtils
+#from core.utils import DatabaseUtils
 from models.schemas import FilterState
+from core.db_service import get_database_service
 
 
 @dataclass
@@ -47,7 +48,7 @@ class FilterService:
     def _get_db_service(self):
         """Lazy initialization of database service"""
         if self._db_service is None:
-            self._db_service = DatabaseUtils.get_database_service()
+            self._db_service = get_database_service()
         return self._db_service
     
     def get_all_filter_options(self, force_refresh: bool = False) -> FilterOptions:

@@ -5,7 +5,7 @@ Provides data loading, processing, and forecasting functionality using MLForecas
 import polars as pl
 from typing import Optional, Dict, Any, List, Tuple
 from core.state_manager import DataState, get_global_state
-from core.utils import DataUtils, DatabaseUtils, ErrorHandler
+from core.utils import DataUtils, ErrorHandler
 from mlforecast import MLForecast
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
@@ -25,6 +25,7 @@ from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from contextlib import contextmanager
 import warnings
+from core.db_service import get_database_service
 
 
 def calculate_seasonal_strength(ts, period):
@@ -174,7 +175,7 @@ def create_enhanced_clusters(df: pl.DataFrame, state: DataState = None) -> pl.Da
     df = df.with_columns(cluster=pl.col('cluster').cast(pl.Utf8))
     
     # Save clusters to database instead of parquet
-    db_service = DatabaseUtils.get_database_service()
+    db_service = get_database_service()
     if db_service:
         db_service.upsert_clusters(df)
     
@@ -383,7 +384,7 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None) -> Tuple[
         
         if forecast_df is not None and not forecast_df.is_empty():
             # Save forecasts to database if service is available
-            db_service = DatabaseUtils.get_database_service()
+            db_service = get_database_service()
             saved_count = 0
             
             if db_service:
@@ -520,7 +521,7 @@ def apply_filters(filters, state: DataState = None):
 
     try:
         # Import database service
-        db_service = DatabaseUtils.get_database_service()
+        db_service = get_database_service()
         if db_service is None:
             return {
                 'fdf': '{}',

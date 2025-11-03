@@ -6,7 +6,8 @@ from typing import Optional, List, Dict, Any
 import polars as pl
 from dataclasses import dataclass, field
 from datetime import datetime
-from core.utils import DataUtils, DatabaseUtils, ErrorHandler
+from core.utils import DataUtils, ErrorHandler
+from core.db_service import get_database_service
 from nicegui import app
 
 
@@ -97,7 +98,7 @@ class DataState:
     def load_sample_data(self, path: str = None) -> pl.DataFrame:
         """Load sample data from DuckDB database."""
         try:
-            db_service = DatabaseUtils.get_database_service()
+            db_service = get_database_service()
             if db_service is None:
                 return None
 
@@ -156,7 +157,7 @@ class DataState:
                 }
             else:
                 # Load filter options from database when no data is loaded yet
-                db_service = DatabaseUtils.get_database_service()
+                db_service = get_database_service()
                 if db_service is None:
                     return self._get_default_filter_options()
                 
@@ -227,6 +228,20 @@ class DataState:
                 self.filtered_products = []
                 self.filtered_models = []
     
+    def prepare_chart_data(self, df: pl.DataFrame, chart_type: str = "line") -> Dict[str, Any]:
+        """Prepare data specifically for charts"""
+        # Since this is a method on DataState, we use 'self'
+        self.filtered_df = df
+        
+        if chart_type == "column":
+            # The internal methods expect the filtered_df to be set, but they also
+            # take a DataFrame argument in the original implementation.
+            # I will pass the filtered_df to the internal methods for consistency.
+            chart_data = self._get_column_chart_data(df)
+        else:  # line chart
+            chart_data = self._get_line_chart_data(df)
+            
+        return chart_data or {}
     def get_chart_data(self, chart_type: str) -> Optional[Dict[str, Any]]:
         """Get data formatted for charts."""
         print(f"DEBUG: state.get_chart_data called with chart_type='{chart_type}'")
@@ -398,3 +413,62 @@ def initialize_global_state() -> None:
         if '_temp_state' not in globals():
             _temp_state = DataState()
         _temp_state.initialize_data()
+
+
+class SessionManager:
+    """Service for managing application state sessions in FastAPI"""
+    
+    def __init__(self):
+        # We'll store user sessions in memory for now, but this could be adapted for Redis or database storage
+        self.sessions: Dict[str, DataState] = {}
+    
+    def get_or_create_session(self, session_id: str) -> DataState:
+        """Get existing session or create a new one"""
+        if session_id not in self.sessions:
+            self.sessions[session_id] = DataState()
+            self.sessions[session_id].initialize_data()
+        return self.sessions[session_id]
+    
+    def initialize_session(self, session_id: str) -> DataState:
+        """Initialize a new session with default state"""
+        self.sessions[session_id] = DataState()
+        self.sessions[session_id].initialize_data()
+        return self.sessions[session_id]
+    
+    def get_session(self, session_id: str) -> Optional[DataState]:
+        """Get session by ID"""
+        return self.sessions.get(session_id)
+    
+    def update_session_data(self, session_id: str, df: pl.DataFrame) -> None:
+        """Update session with new data"""
+        session = self.get_session(session_id)
+        if session:
+            session.df = df
+            session.full_df = df.clone()
+            session.filtered_df = df.clone()
+    
+    def load_sample_data(self, session_id: str) -> pl.DataFrame:
+        """Load sample data for a session"""
+        session = self.get_session(session_id)
+        if session:
+            return session.load_sample_data()
+        return pl.DataFrame()
+    
+    def apply_filters(self, session_id: str, filter_state: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply filters to session data"""
+        # Import the existing apply_filters function
+        from .data_service import apply_filters as core_apply_filters
+        
+        result = core_apply_filters(filter_state)
+        session = self.get_session(session_id)
+        
+        if session and result['filtered_df'] is not None:
+            session.df = result['filtered_df'].clone()
+            session.full_df = result['filtered_df'].clone()
+            session.filtered_df = result['filtered_df'].clone()
+        
+        return result
+
+
+# Global instance of SessionManager
+state_service = SessionManager()

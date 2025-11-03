@@ -11,7 +11,6 @@ from core.state_manager import get_global_state
 from core.data_model import generate_sample_data  # Keep generate_sample_data which might be used
 from core.data_service import apply_filters, create_models_action, change_fc_action
 from forecasting.model_validator import ModelValidator, ValidationReportGenerator
-from core.auth_service import auth_service
 from core.utils import DataUtils, DatabaseUtils, UIUtils, ErrorHandler
 
 

@@ -87,3 +87,7 @@ class CredentialsManager:
                 
         except Exception as e:
             print(f"Error saving credentials: {e}")
+<<<<<<< HEAD
+=======
+
+>>>>>>> ce06da2 (commit before cleanup)

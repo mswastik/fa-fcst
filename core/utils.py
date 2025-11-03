@@ -166,19 +166,6 @@ class UIUtils:
         return n
 
 
-class DatabaseUtils:
-    """Utility class for database operations."""
-
-    @staticmethod
-    def get_database_service():
-        """Get database service instance with proper imports."""
-        try:
-            from core.db_service import get_database_service
-            return get_database_service()
-        except ImportError as e:
-            print(f"Failed to import database service: {e}")
-            return None
-
 
 class ErrorHandler:
     """Centralized error handling utilities."""

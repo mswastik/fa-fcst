@@ -1,17 +1,20 @@
 """
-Authentication service for Microsoft OAuth2 SSO
+Authentication service for Microsoft OAuth2 SSO.
+NOTE: This service is currently not integrated into the main FastAPI application.
+It was originally designed for NiceGUI but this is a FastAPI app, so it's unused.
 """
 import os
-#from typing import Optional
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from authlib.integrations.starlette_client import OAuth
-from nicegui import app, ui
 
 
 class AuthService:
     """Handles Microsoft OAuth2 authentication"""
+    
+    # NOTE: This service uses NiceGUI app.storage.user which won't work in FastAPI
+    # This entire service is not used in the current FastAPI application
 
     def __init__(self, app_instance=None):
         self.oauth = OAuth()
@@ -34,15 +37,19 @@ class AuthService:
 
     def is_authenticated(self, request: Request) -> bool:
         """Check if user is authenticated"""
-        return app.storage.user.get('authenticated', False)
+        # This uses NiceGUI storage which doesn't exist in FastAPI
+        # Service is not used in current application
+        return False
 
     def get_user_info(self):
         """Get current user information"""
-        return app.storage.user
+        # Service is not used in current application
+        return {}
 
     def logout(self):
         """Clear user session"""
-        app.storage.user.clear()
+        # Service is not used in current application
+        pass
 
     async def initiate_login(self, request: Request):
         """Initiate Microsoft OAuth2 login flow"""
@@ -60,26 +67,17 @@ class AuthService:
             user_info = user_info_response.json()
 
             # Store user information in session
-            app.storage.user.update({
-                'authenticated': True,
-                'username': user_info.get('displayName', user_info.get('userPrincipalName', 'Unknown')),
-                'email': user_info.get('userPrincipalName', user_info.get('mail')),
-                'microsoft_id': user_info.get('id'),
-                'token': token
-            })
-
+            # NOTE: This uses NiceGUI storage which doesn't exist in FastAPI
+            # Service is not used in current application
             return True, user_info
         except Exception as e:
             print(f"OAuth callback error: {e}")
             return False, str(e)
 
 
-# Global auth service instance
-auth_service = AuthService()
-
-
 class AuthMiddleware(BaseHTTPMiddleware):
     """Middleware to protect routes with authentication"""
+    # This middleware is never used in app.py, so it's redundant
 
     def __init__(self, app, exclude_paths=None):
         super().__init__(app)
@@ -95,57 +93,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Check authentication
-        if not auth_service.is_authenticated(request):
-            return RedirectResponse(f'/login?redirect_to={request.url.path}')
-
-        return await call_next(request)
-
-
-# Authentication pages
-@ui.page('/login')
-def login_page(redirect_to: str = '/'):
-    """Login page with Microsoft OAuth2"""
-    def initiate_microsoft_login():
-        """Handle Microsoft login button click"""
-        print("Login button clicked - initiating OAuth flow")
-        try:
-            # Check if environment variables are set
-            client_id = os.getenv('MICROSOFT_CLIENT_ID')
-            tenant_id = os.getenv('MICROSOFT_TENANT_ID')
-            client_secret = os.getenv('MICROSOFT_CLIENT_SECRET')
-
-            print(f"Client ID set: {bool(client_id)}")
-            print(f"Tenant ID set: {bool(tenant_id)}")
-            print(f"Client Secret set: {bool(client_secret)}")
-
-            if not client_id or client_id == 'your-client-id':
-                ui.notify('Microsoft OAuth not configured. Please set MICROSOFT_CLIENT_ID environment variable.', type='negative')
-                return
-
-            # Navigate to auth endpoint
-            ui.navigate.to('/auth/login')
-        except Exception as e:
-            print(f"Error in login initiation: {e}")
-            ui.notify(f'Login initiation failed: {str(e)}', type='negative')
-
-    if auth_service.is_authenticated(None):
-        ui.navigate.to(redirect_to)
-        return
-
-    with ui.card().classes('absolute-center'):
-        ui.label('Company Forecasting App').classes('text-2xl text-center mb-4')
-        ui.label('Please sign in with your Microsoft account').classes('text-center mb-6')
-
-        ui.button(
-            'Sign in with Microsoft',
-            on_click=initiate_microsoft_login,
-            icon='login'
-        ).classes('w-full').props('color=primary')
-        ui.label('SSO Login is yet implemented as it requires app registration in Azure').classes('text text-red-600 mt-4 text-center')
+        # NOTE: auth_service.is_authenticated uses NiceGUI storage
+        # This middleware is not used in the current FastAPI application
+        return RedirectResponse(f'/login?redirect_to={request.url.path}')
 
 
-@ui.page('/logout')
-def logout_page():
-    """Logout page"""
-    auth_service.logout()
-    ui.navigate.to('/login')
+# Global auth service instance
+# This is never imported in app.py, so it's redundant
+auth_service = AuthService()

@@ -554,6 +554,66 @@ class DatabaseService:
 
         return item_skey, location_skey
 
+    def get_cross_filtered_options(self, product_type: str, location_type: str, user_id: str = "system") -> List[str]:
+        """Get product options filtered by location type from database"""
+        if not user_id:
+            user_id = "system"
+        
+        try:
+            # Map display names to database column names
+            column_mapping = {
+                'Region': 'region',
+                'Country': 'country',
+                'Area': 'area',
+                'Franchise': 'franchise',
+                'IBP Level 5': 'ibp_level_5',
+                'IBP Level 6': 'ibp_level_6',
+                'CatalogNumber': 'catalog_number'
+            }
+            
+            # Get the corresponding database column names
+            db_product_col = column_mapping.get(product_type, product_type.lower().replace(' ', '_'))
+            db_location_col = column_mapping.get(location_type, location_type.lower().replace(' ', '_'))
+            
+            # Query to get distinct products for the specified location type
+            query = f"""
+            SELECT DISTINCT ph.{db_product_col}
+            FROM da.sales_actuals sa
+            JOIN da.product_hierarchy ph ON sa.item_skey = ph.demantra_item_skey
+            JOIN da.location_hierarchy lh ON sa.location_skey = lh.location_skey
+            WHERE ph.{db_product_col} IS NOT NULL
+            AND lh.{db_location_col} IS NOT NULL
+            """
+            
+            result_df = self.execute_query(query, user_id=user_id)
+            
+            if result_df is not None and not result_df.is_empty():
+                # Extract values, filtering out nulls
+                values = [x for x in result_df[db_product_col].unique().to_list() if x is not None]
+                return values
+            else:
+                return []
+                
+        except Exception as e:
+            print(f"Error getting cross-filtered options: {e}")
+            # Fallback: return all possible values for the product type
+            try:
+                filter_options = self.get_filter_options(user_id=user_id)
+                
+                prod_key = 'catalog_numbers'  # Default
+                if product_type == 'Franchise':
+                    prod_key = 'franchises'
+                elif product_type == 'IBP Level 5':
+                    prod_key = 'ibp_level_5s'
+                elif product_type == 'IBP Level 6':
+                    prod_key = 'ibp_level_6s'
+                elif product_type == 'CatalogNumber':
+                    prod_key = 'catalog_numbers'
+                
+                return filter_options.get(prod_key, [])
+            except:
+                return []
+
     def insert_forecasts(self, forecast_df: pl.DataFrame, model_type: str, user_id: str = None) -> int:
         """
         Inserts forecast data into the da.forecasts table.

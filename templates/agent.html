@@ -2,7 +2,7 @@
 
 {% block content %}
 <div id="agent-container" x-data="agentData()" class="w-full">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">Medical Device Market Research Agent</h2>
+        <h2 class="text-xl font-bold text-gray-800 mb-1">Medical Device Market Research Agent</h2>
         <!-- Input Section -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
             <div>
@@ -44,7 +44,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
             <!-- Left Side: Table -->
             <div class="lg:col-span-1">
-                <div class="bg-gray-50 rounded-lg shadow p-4">
+                <div class="bg-gray-50 rounded-lg shadow p-4 h-full">
                     <h3 class="text-lg font-semibold mb-3">Business Unit & Country Data</h3>
                     <div class="overflow-y-auto max-h-96">
                         <table class="min-w-full divide-y divide-gray-200">
@@ -75,7 +75,7 @@
             
             <!-- Right Side: Output -->
             <div class="lg:col-span-2">
-                <div class="bg-gray-50 rounded-lg shadow p-4 h-full flex flex-col">
+                <div class="bg-gray-50 rounded-lg shadow p-4 h-full flex flex-col h-full">
                     <div class="flex justify-between">
                     <h3 class="text-lg font-semibold mb-3">Agent Output</h3>
                     <button 
@@ -162,8 +162,11 @@
             isSearching: false,
             showConfig: false,
             showSources: false, // New property for collapsible sources
+            showThinking: true, // Flag to show/hide thinking content
             sources: [], // Store sources data
             contentBuffer: '', // Buffer to accumulate tokens
+            thinkingBuffer: '', // Buffer to accumulate thinking content
+            inThinking: false, // Flag to track if we're currently in thinking section
             
             // Configuration
             searchQuery1: '{product} medical device category market growth potential for next 5 years in {region}',
@@ -237,7 +240,10 @@
                     this.sources = []; // Reset sources
                     this.showSources = false; // Hide sources initially
                     this.showDetails = false; // For <details> content
-                    //this.contentBuffer = '';
+                    this.showThinking = true; // Hide thinking initially until we detect it
+                    this.contentBuffer = '';
+                    this.thinkingBuffer = '';
+                    this.inThinking = false; // Reset thinking state
                     
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
@@ -273,10 +279,10 @@
                                         if (data.sources && data.sources.length > 0) {
                                             this.sources = data.sources;
                                             let sourcesHtml = `
-                                                <div class="mb-4">
-                                                    <div class="bg-gray-100 rounded-lg shadow-sm p-4 border border-gray-200">
+                                                <div class="mb-3">
+                                                    <div class="bg-gray-100 rounded-lg shadow-sm p-2 border border-gray-200">
                                                         <div class="flex items-center justify-between cursor-pointer" @click="showSources = !showSources">
-                                                            <h4 class="font-semibold text-gray-800">Sources</h4>
+                                                            <h3 class="font-semibold text-gray-800">Sources</h3>
                                                             <span class="ml-2" x-text="showSources ? '▲' : '▼'" class="text-gray-600"></span>
                                                         </div>
                                                         <div x-show="showSources" class="mt-4 transition-all duration-300 ease-in-out" style="overflow: hidden;" x-collapse>
@@ -290,27 +296,54 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div id="streaming-content" class="prose max-w-none mt-4"></div>
                                             `;
+                                            
+                                            // Add thinking section if we have thinking content
+                                            if (this.thinkingBuffer) {
+                                                sourcesHtml += `
+                                                    <div class="mb-4">
+                                                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
+                                                            <div class="flex items-center justify-between cursor-pointer" @click="showThinking = !showThinking">
+                                                                <h4 class="font-semibold text-gray-800">Agent Thinking Process</h4>
+                                                                <span class="ml-2" x-text="showThinking ? '▲' : '▼'" class="text-gray-600"></span>
+                                                            </div>
+                                                            <div x-show="showThinking" class="mt-2 transition-all duration-300 ease-in-out" style="overflow: hidden;" x-collapse>
+                                                                <div id="thinking-content" class="bg-yellow-100 p-3 rounded text-sm"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                `;
+                                            }
+                                            
+                                            sourcesHtml += `<div id="streaming-content" class="prose max-w-none mt-4"></div>`;
                                             this.outputHtml = sourcesHtml;
                                         } else {
-                                            // If no sources, just start with streaming content
-                                            this.outputHtml = '<div id="streaming-content" class="prose max-w-none"></div>';
+                                            // If no sources, just start with thinking and streaming content
+                                            let mainHtml = '';
+                                            if (this.thinkingBuffer) {
+                                                mainHtml += `
+                                                    <div class="mb-4">
+                                                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
+                                                            <div class="flex items-center justify-between cursor-pointer" @click="showThinking = !showThinking">
+                                                                <h4 class="font-semibold text-gray-800">Agent Thinking Process</h4>
+                                                                <span class="ml-2" x-text="showThinking ? '▲' : '▼'" class="text-gray-600"></span>
+                                                            </div>
+                                                            <div x-show="showThinking" class="mt-2 transition-all duration-300 ease-in-out" style="overflow: hidden;" x-collapse>
+                                                                <div id="thinking-content" class="bg-yellow-100 p-3 rounded text-sm"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                `;
+                                            }
+                                            mainHtml += '<div id="streaming-content" class="prose max-w-none"></div>';
+                                            this.outputHtml = mainHtml;
                                         }
                                     } else if (data.type === 'chunk') {
-                                        // Append the new chunk to the content buffer
-                                        this.contentBuffer += data.content;
+                                        // Process the incoming content to separate thinking content from final output
+                                        let content = data.content;
                                         
-                                        // Process the accumulated content and update the display
-                                        const streamingDiv = document.getElementById('streaming-content');
-                                        if (streamingDiv) {
-                                            // Simple text processing - just escape HTML and handle basic formatting
-                                            const processedContent = this.processContent(this.contentBuffer);
-                                            streamingDiv.innerHTML = processedContent;
-                                            
-                                            // Scroll to bottom to see new content
-                                            streamingDiv.parentElement.scrollTop = streamingDiv.parentElement.scrollHeight;
-                                        }
+                                        // Add content to our processing buffer
+                                        this.processContentWithThinking(content);
                                     } else if (data.type === 'complete') {
                                         // Processing is complete - just process any potential details elements that need formatting
                                         const streamingDiv = document.getElementById('streaming-content');
@@ -362,6 +395,81 @@
                 content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
                 
                 return content;
+            },
+            
+            // Process content with thinking tags handling
+            processContentWithThinking: function(content) {
+                // Look for both <thinking> and  tags, case-insensitive
+                const thinkingStartTags = ['<thinking>', '<think>'];
+                const thinkingEndTags = ['</thinking>', '</think>'];
+                
+                let startTag = null;
+                let endTag = null;
+                let startIndex = -1;
+                let endIndex = -1;
+
+                // Check for all possible start/end tags
+                for (const tStart of thinkingStartTags) {
+                    const idx = content.toLowerCase().indexOf(tStart);
+                    if (idx !== -1 && (startIndex === -1 || idx < startIndex)) {
+                        startIndex = idx;
+                        startTag = tStart;
+                    }
+                }
+
+                for (const tEnd of thinkingEndTags) {
+                    const idx = content.toLowerCase().indexOf(tEnd);
+                    if (idx !== -1 && (endIndex === -1 || idx < endIndex)) {
+                        endIndex = idx;
+                        endTag = tEnd;
+                    }
+                }
+                
+                if (startTag && endTag && startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+                    // We found thinking tags
+                    this.inThinking = true;
+                    this.showThinking = true; // Show thinking section if we detect thinking content
+                    
+                    // Extract thinking content (between tags)
+                    const thinkingStartIndex = startIndex + startTag.length;
+                    const thinkingContent = content.substring(thinkingStartIndex, endIndex);
+                    
+                    // Add thinking content to buffer
+                    this.thinkingBuffer += thinkingContent;
+                    
+                    // Extract non-thinking content (before and after thinking tags)
+                    const beforeThinking = content.substring(0, startIndex);
+                    const afterThinking = content.substring(endIndex + endTag.length);
+                    
+                    // Add non-thinking content to buffer
+                    this.contentBuffer += beforeThinking + afterThinking;
+                } else {
+                    // No thinking tags found, treat all content as regular content
+                    this.contentBuffer += content;
+                }
+                
+                // Update the thinking content display if we have thinking content
+                if (this.thinkingBuffer) {
+                    const thinkingDiv = document.getElementById('thinking-content');
+                    if (thinkingDiv) {
+                        const processedThinkingContent = this.processContent(this.escapeHtml(this.thinkingBuffer));
+                        thinkingDiv.innerHTML = processedThinkingContent;
+                        
+                        // Scroll to bottom to see new content
+                        thinkingDiv.parentElement.scrollTop = thinkingDiv.parentElement.scrollHeight;
+                    }
+                }
+                
+                // Update the main content display
+                const streamingDiv = document.getElementById('streaming-content');
+                if (streamingDiv) {
+                    // Simple text processing - just escape HTML and handle basic formatting
+                    const processedContent = this.processContent(this.contentBuffer);
+                    streamingDiv.innerHTML = processedContent;
+                    
+                    // Scroll to bottom to see new content
+                    streamingDiv.parentElement.scrollTop = streamingDiv.parentElement.scrollHeight;
+                }
             },
             
             // Process any <details> and <summary> elements to make them collapsible

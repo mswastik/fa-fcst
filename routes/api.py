@@ -13,11 +13,13 @@ from typing import Optional
 import asyncio
 
 from models.schemas import FilterRequest, UpdateRequest, ActionRequest, FilterState
-from services.state_service import state_service
-from services.data_service import data_service
+from core.state_manager import state_service
+
+
 import core.data_service as core_data_service
 from services.filter_service import filter_service
-from core.utils import UIUtils, DatabaseUtils
+from core.utils import UIUtils
+from core.db_service import get_database_service
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -722,7 +724,7 @@ async def handle_action(request: Request):
         
         elif action == "change_fc":
             # Call the existing change_fc function
-            result = data_service.change_fc()
+            result = core_data_service.change_fc_action()
             
             html = f"""
             <div class="p-4 text-center text-blue-500">
@@ -878,7 +880,7 @@ async def get_regions(request: Request):
     """Get available regions for the agent page"""
     try:
         # Get regions from database
-        db_service = DatabaseUtils.get_database_service()
+        db_service = get_database_service()
         if db_service is not None:
             user_id = request.session.get('user_id', 'system')
             country_query = """
@@ -904,7 +906,7 @@ async def get_agent_table_data(request: Request):
     """Get business unit and country data for the agent page"""
     try:
         # Get data from database with YoY growth and YTD growth calculation
-        db_service = DatabaseUtils.get_database_service()
+        db_service = get_database_service()
         if db_service is None:
             return JSONResponse({"rows": []})
         
@@ -1138,8 +1140,8 @@ async def run_agent_stream_api(request: Request):
                 traceback.print_exc()
                 return ""
 
-        def summarize_streaming(text, prompt="Summarize:", model="gemma3n"):
-            """Generator that yields chunks of the summary as they are received"""
+        def summarize_streaming(text, prompt="Summarize:", model="qwen-thinking"):
+            """Generator that yields chunks of the summary as they are received, properly handling thinking content"""
             stream = client.chat.completions.create(
                 model=model,  # use whatever name your server registered
                 messages=[
@@ -1207,7 +1209,8 @@ async def run_agent_stream_api(request: Request):
                 
                 print(f"Sources collected: {len(sources)}")
                 print(f"Content chunks collected: {len(all_content)}")
-                
+                yield f"data: {json.dumps({'type': 'status', 'message': sources})}\n\n"
+
                 if all_content:
                     combined_text = "\n---\n".join(all_content)
                     
@@ -1225,6 +1228,7 @@ async def run_agent_stream_api(request: Request):
                             f"You are a {role}. Give your reply in concise 100 words and 3 bullet points to {objective} "
                             f"The current forecast within Stryker is giving CAGR of 0%. "  # Using 0% as placeholder since we don't have the growth data
                             "Your main task is to look into the web articles provided by user and compare CAGR of Stryker with CAGR forecasts done in these articles. "
+                            "Think step by step and provide your reasoning between <think> tags. "
                             """Always remember below important points while replying: 
                                 - Do not output disclaimer
                                 - Do not start with Okay
@@ -1233,7 +1237,7 @@ async def run_agent_stream_api(request: Request):
                                 - Do not output more than 200 words
                                 """
                         ),
-                        model="gemma3n"  # Changed from qwen-thinking since that model might not be available
+                        model="qwen-thinking"  # Changed back to qwen-thinking to support thinking content
                     ):
                         full_summary += chunk
                         
