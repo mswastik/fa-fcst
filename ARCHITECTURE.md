@@ -8,29 +8,29 @@ This diagram shows the main components and their interactions, highlighting the 
 
 ```mermaid
 graph TD
-    subgraph Frontend (HTMX JS)
+    subgraph Frontend["Frontend (HTMX JS)"]
         A[User Interface] -- Filter/Action --> B(FastAPI Routes)
         B -- HTML/Data --> A
     end
 
-    subgraph Backend (FastAPI)
+    subgraph Backend["Backend (FastAPI)"]
         B -- State/DB Access --> C(Core Services)
         B -- Forecasting Logic --> D(Forecasting Module)
         B -- AI Agent --> E(External LLM/Search)
     end
 
-    subgraph Core Services
+    subgraph CoreServices["Core Services"]
         C -- Connection Mgmt --> F(DuckDB Connection Manager)
         C -- Data Access --> G(Database Service)
         C -- State Mgmt --> H(DataState)
     end
 
-    subgraph Data Layer
+    subgraph DataLayer["Data Layer"]
         G -- SQL Query --> I[DuckDB Database]
         J[External ODBC Source] -- Fetch Data --> I
     end
 
-    subgraph Forecasting Module
+    subgraph ForecastingModule["Forecasting Module"]
         D -- Data Prep --> K(Data Processor)
         D -- Model Creation --> L(Model Factory)
         D -- Validation --> M(Model Validator)
@@ -40,9 +40,9 @@ graph TD
 
     style Frontend fill:#f9f,stroke:#333,stroke-width:2px
     style Backend fill:#ccf,stroke:#333,stroke-width:2px
-    style Core Services fill:#ddf,stroke:#333,stroke-width:2px
-    style Forecasting Module fill:#cfc,stroke:#333,stroke-width:2px
-    style Data Layer fill:#ffc,stroke:#333,stroke-width:2px
+    style CoreServices fill:#ddf,stroke:#333,stroke-width:2px
+    style ForecastingModule fill:#cfc,stroke:#333,stroke-width:2px
+    style DataLayer fill:#ffc,stroke:#333,stroke-width:2px
 ```
 
 ## 2. Module Dependency Diagram
