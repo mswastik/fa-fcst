@@ -40,16 +40,6 @@ def initialize_data():
     state = get_global_state()
     state.initialize_data()
 
-def generate_sample_data(path: str = None) -> pl.DataFrame:
-    """Generate sample data for the application from DuckDB with lazy loading"""
-    if path is None:
-        # Lazy loading mode - return empty dataframe until filters are applied
-        return pl.DataFrame()
-    else:
-        # Legacy mode for backward compatibility
-        state = get_global_state()
-        return state.load_sample_data(path)
-
 
 
 
