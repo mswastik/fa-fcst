@@ -15,7 +15,7 @@ from models.schemas import FilterState
 from core.state_manager import state_service
 
 #from services.data_service import data_service
-from services.filter_service import filter_service # Import filter_service
+from core.db_service import get_database_service
 from core.utils import UIUtils, CustomJsonEncoder
 
 router = APIRouter()
@@ -39,10 +39,13 @@ async def dashboard(request: Request):
         session.full_df = None
         session.filtered_df = None
     
-    # Get initial filter options (these are small and safe to load with caching)
-    initial_filter_options = filter_service.get_initial_filter_options()
-    initial_location_options = initial_filter_options['initial_location_options']
-    initial_product_options = initial_filter_options['initial_product_options']
+    # Get initial filter options from database service
+    db_service = get_database_service()
+    filter_options = db_service.get_filter_options(user_id="system")
+    
+    # Create initial options similar to what filter_service provided
+    initial_location_options = filter_options.get('regions', [])
+    initial_product_options = filter_options.get('franchises', [])
     
     return templates.TemplateResponse("dashboard.html", {
         "request": request,

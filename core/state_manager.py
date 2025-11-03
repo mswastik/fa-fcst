@@ -252,8 +252,17 @@ class DataState:
         filtered_df = pl.DataFrame(self.filtered_df)
         print(f"DEBUG: filtered_df has {len(filtered_df)} rows, columns: {list(filtered_df.columns)}")
         
-        # Ensure SALES_DATE is datetime before processing
+        # Check for either 'SALES_DATE' (UI format) or 'sales_date' (DB format) and standardize
+        date_column = None
         if 'SALES_DATE' in filtered_df.columns:
+            date_column = 'SALES_DATE'
+        elif 'sales_date' in filtered_df.columns:
+            date_column = 'sales_date'
+            # Rename to match the expected format in chart methods
+            filtered_df = filtered_df.rename({'sales_date': 'SALES_DATE'})
+        
+        if date_column:
+            # Ensure SALES_DATE is datetime before processing
             try:
                 # Check if it's already datetime
                 if filtered_df['SALES_DATE'].dtype != pl.Datetime:
@@ -274,7 +283,10 @@ class DataState:
                 except Exception as e2:
                     print(f"DEBUG: Alternative datetime conversion failed: {e2}")
                     return None
-        
+        else:
+            print("DEBUG: No date column found (SALES_DATE or sales_date)")
+            return None
+            
         chart_data = filtered_df.clone()
         print(f"DEBUG: Chart data prepared, proceeding to {chart_type} chart generation")
         

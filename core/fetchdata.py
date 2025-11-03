@@ -3,7 +3,6 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import polars as pl
 import os
-from nicegui import run
 import pyodbc
 #from utils import ErrorHandler
 import duckdb

@@ -7,7 +7,7 @@ import threading
 import time
 import logging
 import uuid
-from typing import Optional, List, Dict, Any, Tuple, Callable
+from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 import polars as pl

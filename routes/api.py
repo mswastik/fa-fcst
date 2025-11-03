@@ -17,9 +17,8 @@ from core.state_manager import state_service
 
 
 import core.data_service as core_data_service
-from services.filter_service import filter_service
-from core.utils import UIUtils
 from core.db_service import get_database_service
+from core.utils import UIUtils
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -38,35 +37,53 @@ async def update_filters(
     Returns updated HTML for the corresponding select2 element.
     """
     try:
-        # Create filter state
-        filter_state = FilterState(
-            location1=location1,
-            location2=location2 or "",
-            product1=product1,
-            product2=product2 or ""
-        )
+        db_service = get_database_service()
         
-        # Get updated options based on which filter changed
-        options = filter_service.get_options_for_select2(filter_state)
+        # Get available options based on current selections
+        filter_options = db_service.get_filter_options(user_id="system")
         
+        # Determine which options to return based on the filter that changed
         if filter_name == "location1":
+            # When location1 changes, we want to update location2 options
+            # Get all available location options based on location1 selection
+            if location1 == "Region":
+                options = filter_options.get("regions", [])
+            elif location1 == "Country":
+                options = filter_options.get("countries", [])
+            elif location1 == "Area":
+                options = filter_options.get("areas", [])
+            else:
+                options = []
+                
             # Return updated location2 dropdown
             return templates.TemplateResponse(
                 "partials/location_select2.html",
                 {
                     "request": request,
                     "label": location1,
-                    "options": options['location2_options']
+                    "options": options
                 }
             )
         elif filter_name == "product1":
+            # When product1 changes, we want to update product2 options
+            if product1 == "Franchise":
+                options = filter_options.get("franchises", [])
+            elif product1 == "IBP Level 5":
+                options = filter_options.get("ibp_level_5s", [])
+            elif product1 == "IBP Level 6":
+                options = filter_options.get("ibp_level_6s", [])
+            elif product1 == "CatalogNumber":
+                options = filter_options.get("catalog_numbers", [])
+            else:
+                options = []
+                
             # Return updated product2 dropdown
             return templates.TemplateResponse(
                 "partials/product_select2.html",
                 {
                     "request": request,
                     "label": product1,
-                    "options": options['product2_options']
+                    "options": options
                 }
             )
             
@@ -163,9 +180,31 @@ async def update_dashboard(request: Request):
     print(f"Filter state: {filter_state}")
     
     if load_data_condition:
-        # Use the new FilterService to get filtered data
+        # Use the db_service to get filtered data
         try:
-            filtered_df, metadata = filter_service.get_filtered_data(filter_state)
+            db_service = get_database_service()
+            filtered_df = db_service.get_filtered_sales_actuals(
+                location_col=filter_state.location1,
+                location_val=filter_state.location2,
+                product_col=filter_state.product1,
+                product_val=filter_state.product2,
+                user_id="system"
+            )
+            
+            # Apply standard data preparation for UI
+            from core.utils import DataUtils
+            if filtered_df is not None and not filtered_df.is_empty():
+                filtered_df = DataUtils.prepare_data_for_ui(filtered_df)
+            
+            # Prepare metadata similar to what filter_service provided
+            metadata = {
+                "total_records": len(filtered_df) if filtered_df is not None and not filtered_df.is_empty() else 0,
+                "filters_applied": {
+                    "location": f"{filter_state.location1} = {filter_state.location2}" if filter_state.location1 and filter_state.location2 else None,
+                    "product": f"{filter_state.product1} = {filter_state.product2}" if filter_state.product1 and filter_state.product2 else None
+                },
+                "columns": list(filtered_df.columns) if filtered_df is not None and not filtered_df.is_empty() else []
+            }
             
             print(f"Filtered DataFrame shape: {filtered_df.shape if filtered_df is not None else 'None'}")
             print(f"Metadata: {metadata}")
@@ -660,8 +699,25 @@ async def handle_action(request: Request):
                 """
                 return HTMLResponse(content=html)
             
-            # Load filtered data based on current filters using the new FilterService
-            filtered_df, metadata = filter_service.get_filtered_data(filter_state)
+            # Load filtered data based on current filters using db_service
+            db_service = get_database_service()
+            filtered_df = db_service.get_filtered_sales_actuals(
+                location_col=filter_state.location1,
+                location_val=filter_state.location2,
+                product_col=filter_state.product1,
+                product_val=filter_state.product2,
+                user_id="system"
+            )
+            
+            # Prepare metadata similar to what filter_service provided
+            metadata = {
+                "total_records": len(filtered_df) if filtered_df is not None and not filtered_df.is_empty() else 0,
+                "filters_applied": {
+                    "location": f"{filter_state.location1} = {filter_state.location2}" if filter_state.location1 and filter_state.location2 else None,
+                    "product": f"{filter_state.product1} = {filter_state.product2}" if filter_state.product1 and filter_state.product2 else None
+                },
+                "columns": list(filtered_df.columns) if filtered_df is not None and not filtered_df.is_empty() else []
+            }
             
             if filtered_df is None or filtered_df.is_empty():
                 html = """
