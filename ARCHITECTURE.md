@@ -16,7 +16,7 @@ graph TD
     subgraph Backend["Backend (FastAPI)"]
         B -- State/DB Access --> C(Core Services)
         B -- Forecasting Logic --> D(Forecasting Module)
-        B -- AI Agent --> E(External LLM/Search)
+        B -- AI Agent --> E(Local LLM/ Web Search)
     end
 
     subgraph CoreServices["Core Services"]
@@ -27,7 +27,11 @@ graph TD
 
     subgraph DataLayer["Data Layer"]
         G -- SQL Query --> I[DuckDB Database]
-        J[External ODBC Source] -- Fetch Data --> I
+        
+    end
+
+    subgraph Database
+        J[Envision DB] -- Fetch Data --> I
     end
 
     subgraph ForecastingModule["Forecasting Module"]
