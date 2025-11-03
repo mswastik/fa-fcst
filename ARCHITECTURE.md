@@ -8,7 +8,7 @@ This diagram shows the main components and their interactions, highlighting the 
 
 ```mermaid
 graph TD
-    subgraph Frontend (HTMX/JavaScript)
+    subgraph Frontend (HTMX JS)
         A[User Interface] -- Filter/Action --> B(FastAPI Routes)
         B -- HTML/Data --> A
     end
