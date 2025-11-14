@@ -10,8 +10,26 @@
     hx-swap="none"
     hx-on:htmx:after-request="initializePivotInterface(event.detail.xhr.response)"
 >
-    <option value="">Select {{ label|lower }}...</option>
+    <!-- <option value="">Select {{ label|lower }}...</option> -->
     {% for option in options %}
     <option value="{{ option }}">{{ option }}</option>
     {% endfor %}
 </select>
+<script>
+// Initialize TomSelect after the select element is inserted into the DOM
+setTimeout(() => {
+    if (typeof TomSelect !== 'undefined') {
+        const selectElement = document.querySelector('[name="location2"].tom-select:not(.tom-selected)');
+        if (selectElement && !selectElement.tomselect) {
+            const tomSelectInstance = new TomSelect(selectElement, {
+                create: false,
+                maxItems: 1,
+                allowEmptyOption: true,
+                closeAfterSelect: true,
+                placeholder: 'Search or select...'
+            });
+            selectElement.classList.add('tom-selected');
+        }
+    }
+}, 100);
+</script>

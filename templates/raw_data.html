@@ -553,15 +553,76 @@
 
         // Initialize TomSelect for dropdowns with search functionality
         if (typeof TomSelect !== 'undefined') {
-            new TomSelect('.tom-select', {
-                create: false,
-                maxItems: 1,
-                allowEmptyOption: true,
-                closeAfterSelect: true,
-                allowEmptyOption: false,
-                placeholder: 'Select an option...'
+            // Initialize immediately and also set up mutation observer for dynamic content
+            initializeTomSelects();
+
+            // Set up mutation observer to handle dynamically added content (like HTMX responses)
+            const observer = new MutationObserver(function(mutations) {
+                let shouldReinitialize = false;
+
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'childList') {
+                        mutation.addedNodes.forEach(function(node) {
+                            if (node.nodeType === 1) { // Element node
+                                // Check if added node is a select with tom-select class or contains such elements
+                                if (node.classList && node.classList.contains('tom-select') && !node.classList.contains('ts-wrapper')) {
+                                    shouldReinitialize = true;
+                                } else if (node.querySelector && node.querySelector('.tom-select:not(.ts-wrapper)')) {
+                                    shouldReinitialize = true;
+                                }
+                            }
+                        });
+
+                        if (shouldReinitialize) {
+                            setTimeout(initializeTomSelects, 100); // Small delay to ensure DOM is updated
+                        }
+                    }
+                });
+            });
+
+            // Start observing the document for changes
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
             });
         }
+    });
+
+    // Function to initialize TomSelect for all matching elements
+    function initializeTomSelects() {
+        // Select all elements with tom-select class that haven't been initialized yet
+        const selectElements = document.querySelectorAll('.tom-select:not(.ts-wrapper)');
+        selectElements.forEach(function(selectElement) {
+            // Skip if it's already been initialized
+            if (selectElement.tomselect) return;
+
+            // Add a check to ensure TomSelect is defined before initializing
+            if (typeof TomSelect !== 'undefined') {
+                new TomSelect(selectElement, {
+                    create: false,
+                    maxItems: 1,
+                    allowEmptyOption: true,
+                    closeAfterSelect: true,
+                    placeholder: 'Search or select...',
+                    searchPlaceholder: 'Type to search...',
+                    onInitialize: function() {
+                        // Additional initialization code if needed
+                    }
+                });
+            }
+        });
+    }
+
+    // Set up an event listener for HTMX content loading to reinitialize TomSelect
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof TomSelect !== 'undefined') {
+            initializeTomSelects();
+        }
+
+        // Listen for HTMX events to reinitialize TomSelect on dynamically loaded content
+        document.addEventListener('htmx:afterOnLoad', function(evt) {
+            setTimeout(initializeTomSelects, 0);
+        });
     });
 
     function toggleSidebar(sidebarId) {

@@ -15,3 +15,21 @@
     <option value="{{ option }}">{{ option }}</option>
     {% endfor %}
 </select>
+<script>
+// Initialize TomSelect after the select element is inserted into the DOM
+setTimeout(() => {
+    if (typeof TomSelect !== 'undefined') {
+        const selectElement = document.querySelector('[name="product2"].tom-select:not(.tom-selected)');
+        if (selectElement && !selectElement.tomselect) {
+            const tomSelectInstance = new TomSelect(selectElement, {
+                create: false,
+                maxItems: 1,
+                allowEmptyOption: true,
+                closeAfterSelect: true,
+                placeholder: 'Search or select...'
+            });
+            selectElement.classList.add('tom-selected');
+        }
+    }
+}, 100);
+</script>
