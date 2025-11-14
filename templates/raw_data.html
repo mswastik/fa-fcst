@@ -551,11 +551,15 @@
             generateBtn.addEventListener('click', generatePivotAnalysis);
         }
 
-        // Initialize TomSelect for dropdowns
+        // Initialize TomSelect for dropdowns with search functionality
         if (typeof TomSelect !== 'undefined') {
             new TomSelect('.tom-select', {
                 create: false,
-                maxItems: 1
+                maxItems: 1,
+                allowEmptyOption: true,
+                closeAfterSelect: true,
+                allowEmptyOption: false,
+                placeholder: 'Select an option...'
             });
         }
     });
@@ -2419,6 +2423,23 @@
             document.addEventListener('DOMContentLoaded', function() {
                 // Ensure conversion happens after the DOM is ready and initial data might be loaded
                 convertMultiSelectToAutocomplete();
+
+                // Trigger initial population of location2 and product2 based on initial values
+                setTimeout(function() {
+                    const location1Select = document.querySelector('select[name="location1"]');
+                    const product1Select = document.querySelector('select[name="product1"]');
+
+                    // Trigger change events for initial values to populate location2 and product2
+                    if (location1Select && location1Select.value) {
+                        const event = new Event('change', { bubbles: true });
+                        location1Select.dispatchEvent(event);
+                    }
+
+                    if (product1Select && product1Select.value) {
+                        const event = new Event('change', { bubbles: true });
+                        product1Select.dispatchEvent(event);
+                    }
+                }, 100); // Small delay to ensure DOM is fully loaded
             });
         </script>
     </div>
