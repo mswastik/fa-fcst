@@ -1,38 +1,140 @@
 {% extends "base.html" %}
 {% block content %}
-        <!-- The content from ui/data.html body and script -->
-            <div class="main-content rounded-lg shadow p-0">
-                <div class="sidebar" id="sidebar-left">
-                    <button class="sidebar-toggle-button" onclick="toggleSidebar('sidebar-left')"><span class="toggle-icon"><<</span></button>
-                    <div class="field-group">
-                        <h4>Rows</h4>
-                        <select class="field-list field-select" data-zone="rows" id="row-fields" multiple></select>
-                    </div>
-                    <div class="field-group">
-                        <h4>Columns</h4>
-                        <select class="field-list field-select" data-zone="columns" id="column-fields" multiple></select>
-                    </div>
-            
-                    <div class="field-group">
-                        <h4>Values</h4>
-                        <select class="field-list field-select" data-zone="values" id="value-fields" multiple></select>
-                    </div>
-                    <div class="field-group">
-                        <h4>Facet By</h4>
-                        <select class="field-list" id="facet-field">
-                            <option value="">None</option>
-                        </select>
-                    </div>
-                    <div class="field-group">
-                        <h4>Filters</h4>
-                        <div class="filter-controls">
-                            <select id="filter-field" class="filter-select"><div></div></select>
-                          <div style="display:grid;grid-template-columns: 1fr 1fr;gap: 4px;">
-                          </div>
-                        </div>
-                        <div id="active-filters" class="active-filters"></div>
-                    </div>
+    <!-- Add filtering controls similar to homepage -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex flex-wrap items-center gap-4">
+                <!-- Location 1 Filter -->
+                <div id="location1-container" class="min-w-[160px] flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1" id="location1-label">{{ initial_location_options[0] }}</label>
+                    <select
+                        name="location1"
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                        hx-post="/api/raw_data/filter_options"
+                        hx-include="[name='location1']"
+                        hx-target="#location2-container"
+                        hx-trigger="change"
+                        hx-indicator=".htmx-indicator"
+                        hx-swap="innerHTML"
+                        hx-vals="js:{filter_name: 'location1'}"
+                    >
+                        {% for option in initial_location_options %}
+                        <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
+
+                <!-- Location 2 Filter -->
+                <div id="location2-container" class="min-w-[160px] flex-1">
+                    {% if location_options %}
+                        {% include 'partials/raw_data_location_select2.html' %}
+                    {% else %}
+                        <label class="block text-sm font-medium text-gray-700 mb-1" id="location2-label">{{ initial_location_options[0] }}</label>
+                        <select
+                            name="location2"
+                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                            hx-post="/api/raw_data/pivot"
+                            hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
+                            hx-indicator=".htmx-indicator"
+                            hx-trigger="change"
+                            hx-target="body"
+                            hx-swap="none"
+                            hx-on:htmx:after-request="initializePivotInterface(event.detail.xhr.response)"
+                        >
+                            <option value="">Select {{ initial_location_options[0] }}...</option>
+                            {% for option in location_options %}
+                            <option value="{{ option }}">{{ option }}</option>
+                            {% endfor %}
+                        </select>
+                    {% endif %}
+                </div>
+
+                <!-- Product 1 Filter -->
+                <div id="product1-container" class="min-w-[160px] flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1" id="product1-label">{{ initial_product_options[0] }}</label>
+                    <select
+                        name="product1"
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                        hx-post="/api/raw_data/filter_options"
+                        hx-include="[name='product1']"
+                        hx-target="#product2-container"
+                        hx-trigger="change"
+                        hx-indicator=".htmx-indicator"
+                        hx-swap="innerHTML"
+                        hx-vals="js:{filter_name: 'product1'}"
+                    >
+                        {% for option in initial_product_options %}
+                        <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Product 2 Filter -->
+                <div id="product2-container" class="min-w-[160px] flex-1">
+                    {% if product_options %}
+                        {% include 'partials/raw_data_product_select2.html' %}
+                    {% else %}
+                        <label class="block text-sm font-medium text-gray-700 mb-1" id="product2-label">{{ initial_product_options[0] }}</label>
+                        <select
+                            name="product2"
+                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                            hx-post="/api/raw_data/pivot"
+                            hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
+                            hx-indicator=".htmx-indicator"
+                            hx-trigger="change"
+                            hx-target="body"
+                            hx-swap="none"
+                            hx-on:htmx:after-request="initializePivotInterface(event.detail.xhr.response)"
+                        >
+                            <option value="">Select {{ initial_product_options[0] }}...</option>
+                            {% for option in product_options %}
+                            <option value="{{ option }}">{{ option }}</option>
+                            {% endfor %}
+                        </select>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content area -->
+    <div id="raw-data-content" class="main-content rounded-lg shadow p-0">
+        <!-- Loading indicator -->
+        <div class="htmx-indicator" style="display: none;">
+            <div class="loading-spinner"></div>
+            <span>Loading...</span>
+        </div>
+        <div class="sidebar" id="sidebar-left">
+            <button class="sidebar-toggle-button" onclick="toggleSidebar('sidebar-left')"><span class="toggle-icon"><<</span></button>
+            <div class="field-group">
+                <h4>Rows</h4>
+                <select class="field-list field-select" data-zone="rows" id="row-fields" multiple></select>
+            </div>
+            <div class="field-group">
+                <h4>Columns</h4>
+                <select class="field-list field-select" data-zone="columns" id="column-fields" multiple></select>
+            </div>
+
+            <div class="field-group">
+                <h4>Values</h4>
+                <select class="field-list field-select" data-zone="values" id="value-fields" multiple></select>
+            </div>
+            <div class="field-group">
+                <h4>Facet By</h4>
+                <select class="field-list" id="facet-field">
+                    <option value="">None</option>
+                </select>
+            </div>
+            <div class="field-group">
+                <h4>Filters</h4>
+                <div class="filter-controls">
+                    <select id="filter-field" class="filter-select"><div></div></select>
+                  <div style="display:grid;grid-template-columns: 1fr 1fr;gap: 4px;">
+                  </div>
+                </div>
+                <div id="active-filters" class="active-filters"></div>
+            </div>
+        </div>
                 <div class="sidebar" id="sidebar-right">
                     <button class="sidebar-toggle-button" onclick="toggleSidebar('sidebar-right')"><span class="toggle-icon"><<</span></button>
                 <div class="field-group" style="max-width: 100%;">
@@ -66,7 +168,7 @@
                     <div id="chart-view" class="tab-content active">
                         <div class="chart-controls">
                             <select class="chart-select" id="chart-type" onchange="updateChart()">
-                                <option value="line">Line Chart</option>      
+                                <option value="line">Line Chart</option>
                                 <option value="bar">Bar Chart</option>
                                 <option value="pie">Pie Chart</option>
                                 <option value="doughnut">Doughnut Chart</option>
@@ -233,38 +335,261 @@
                     </div>
                 </div>
 
-        
+
         <script>
+    // Global variables for data management
+    let rawData = null;
+    let filteredData = null;
+    let pivotData = null;
+
+    // Function to handle data loading from API
+    async function loadFilteredData() {
+        const location1 = document.querySelector('select[name="location1"]').value;
+        const location2 = document.querySelector('select[name="location2"]').value;
+        const product1 = document.querySelector('select[name="product1"]').value;
+        const product2 = document.querySelector('select[name="product2"]').value;
+
+        try {
+            const response = await fetch('/api/raw_data', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    location1,
+                    location2,
+                    product1,
+                    product2
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch data');
+            }
+
+            const result = await response.json();
+            rawData = result.data;
+            filteredData = [...rawData];
+
+            // Initialize the pivot interface with the loaded data
+            initializePivotInterface(rawData);
+
+        } catch (error) {
+            console.error('Error loading data:', error);
+            alert('Failed to load data. Please try again.');
+        }
+    }
+
+    // Function to initialize pivot interface with data
+    function initializePivotInterface(response) {
+    console.log("initializePivotInterface called.");
+    let data;
+    try {
+        // Check if response is already a JSON object or a string
+        if (typeof response === 'string' || response instanceof String) {
+            data = JSON.parse(response).data;
+        } else if (typeof response === 'object' && response.data) {
+            data = response.data; // If it's already parsed
+        } else {
+            data = response;
+        }
+    } catch (e) {
+        console.error("Invalid JSON response:", response, e);
+        return;
+    }
+
+    if (!data || data.length === 0) {
+        console.log('No data available from filters. Clearing UI.');
+        if (typeof clearAll === 'function') {
+            clearAll();
+        }
+        return;
+    }
+
+    console.log(`Data received with ${data.length} rows.`);
+
+    originalData = data;
+    filteredData = [...originalData];
+    currentData = [...originalData];
+    console.log("Global data variables set.");
+
+    updateAvailableFields(data);
+    console.log("Available fields updated.");
+
+    // Instead of clearing all, we should preserve selections and just update data
+    clearFilters();
+    console.log("Filters cleared.");
+
+    updateRawDataView();
+    renderCatalogNumberTable();
+    console.log("Raw data and catalog table rendered.");
+
+    // Update multiselect to autocomplete after DOM updates
+    convertMultiSelectToAutocomplete();
+
+    // Apply default selections if none are made
+    const rowFieldsSelect = document.getElementById('row-fields');
+    const valueFieldsSelect = document.getElementById('value-fields');
+
+    // Check if already selected before setting defaults
+    let hasRowSelection = Array.from(rowFieldsSelect.selectedOptions).length > 0;
+    let hasValueSelection = Array.from(valueFieldsSelect.selectedOptions).length > 0;
+
+    if (!hasRowSelection) {
+        const defaultRowField = 'sales_date';
+        const rowOption = Array.from(rowFieldsSelect.options).find(opt => opt.value === defaultRowField);
+        if (rowOption) {
+            rowOption.selected = true;
+            console.log("Default row field 'SALES_DATE' selected.");
+        } else {
+            console.log("Default row field 'SALES_DATE' not found.");
+        }
+    }
+
+    if (!hasValueSelection) {
+        const defaultValueField = 'act_orders_rev';
+        const valueOption = Array.from(valueFieldsSelect.options).find(opt => opt.value === defaultValueField);
+        if (valueOption) {
+            valueOption.selected = true;
+            console.log("Default value field 'Act Orders Rev' selected.");
+        } else {
+            console.log("Default value field 'Act Orders Rev' not found.");
+        }
+    }
+
+    // Update custom displays
+    [rowFieldsSelect, valueFieldsSelect].forEach(s => {
+        if (s && s._updateCustomDisplay) {
+            console.log(`Updating custom display for ${s.id}`);
+            s._updateCustomDisplay();
+        } else {
+            console.log(`_updateCustomDisplay not found for ${s.id}`);
+        }
+    });
+    console.log("Custom displays updated.");
+
+    // Generate the pivot data with the loaded data
+    generatePivot();
+}
+
+    // Function to set default field selections
+    function setDefaultSelections() {
+        const rowFields = document.getElementById('row-fields');
+        const valueFields = document.getElementById('value-fields');
+
+        // Set default row field (SALES_DATE if available)
+        if (rowFields) {
+            const salesDateOption = Array.from(rowFields.options).find(opt => opt.value === 'SALES_DATE');
+            if (salesDateOption) {
+                salesDateOption.selected = true;
+            }
+        }
+
+        // Set default value field (Act Orders Rev if available)
+        if (valueFields) {
+            const revOption = Array.from(valueFields.options).find(opt => opt.value === 'Act Orders Rev');
+            if (revOption) {
+                revOption.selected = true;
+            }
+        }
+    }
+
+    // Main function to generate pivot analysis
+    function generatePivotAnalysis() {
+        if (!filteredData || filteredData.length === 0) {
+            console.log('No data available for analysis');
+            return;
+        }
+
+        // Get selected fields
+        const rowFields = getSelectedFields('row-fields');
+        const columnFields = getSelectedFields('column-fields');
+        const valueFields = getSelectedFields('value-fields');
+
+        console.log("Selected fields for pivot:", { rows: rowFields, columns: columnFields, values: valueFields });
+
+        // Generate pivot table
+        pivotData = createPivotTable(filteredData, rowFields, columnFields, valueFields);
+
+        // Render pivot table
+        renderPivotTable(pivotData);
+
+        // Generate metrics
+        generateMetrics(pivotData);
+
+        // Update charts if chart tab is active
+        if (document.getElementById('chart-view').classList.contains('active')) {
+            updateChart();
+        }
+    }
+
+        // Function to get selected fields from a select element
+
+        function getSelectedFields(selectId) {
+
+            const select = document.getElementById(selectId);
+
+            if (!select) return [];
+
+
+
+            const selectedOptions = Array.from(select.selectedOptions);
+
+            return selectedOptions.map(option => option.value);
+
+        }
+
+
+
+
+
+    // Initialize the application
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set up generate analysis button
+        const generateBtn = document.getElementById('generate-analysis');
+        if (generateBtn) {
+            generateBtn.addEventListener('click', generatePivotAnalysis);
+        }
+
+        // Initialize TomSelect for dropdowns
+        if (typeof TomSelect !== 'undefined') {
+            new TomSelect('.tom-select', {
+                create: false,
+                maxItems: 1
+            });
+        }
+    });
+
     function toggleSidebar(sidebarId) {
         const sidebar = document.getElementById(sidebarId);
         const mainContent = document.querySelector('.main-content');
         const button = sidebar.querySelector('.sidebar-toggle-button');
-        
+
         // Toggle visibility class
         const isCollapsed = sidebar.classList.contains('collapsed');
         sidebar.classList.toggle('collapsed', !isCollapsed);
-        
+
         // Maintain original grid template if already set
         if (!mainContent.style.gridTemplateColumns) {
             mainContent.style.gridTemplateColumns = '200px 200px 1fr';
         }
-        
+
         let columns = mainContent.style.gridTemplateColumns.split(' ');
-        
+
         // Ensure correct column structure
         if (columns.length !== 3) {
             columns = ['200px', '200px', '1fr'];
         }
-        
+
         // Adjust only the relevant sidebar width
         if (sidebarId === 'sidebar-left') {
             columns = isCollapsed ? '200px' : '50px';
         } else if (sidebarId === 'sidebar-right') {
             columns = isCollapsed ? '200px' : '50px';
         }
-        
+
         mainContent.style.gridTemplateColumns = columns.join(' ');
-        
+
         // Update button icon
         const icon = button.querySelector('.toggle-icon');
         if (icon) {
@@ -274,31 +599,32 @@
         }
     }
 
+
         function convertMultiSelectToAutocomplete() {
             // Find all select elements with multiple attribute
             const multiSelects = document.querySelectorAll('select[multiple]');
-            
+
             multiSelects.forEach(select => {
                 // Remove existing custom multiselect if it was already converted
                 const existingCustomContainer = select.nextElementSibling;
                 if (existingCustomContainer && existingCustomContainer.classList.contains('custom-multiselect')) {
                     existingCustomContainer.remove();
                 }
-                
+
                 // Get original options
                 const options = Array.from(select.options).map(opt => ({
                     value: opt.value,
                     text: opt.textContent,
                     selected: opt.selected
                 }));
-                
+
                 // Create custom multiselect container
                 const container = document.createElement('div');
                 container.className = 'custom-multiselect';
                 container.style.position = 'relative';
                 container.style.width = '100%';
                 container.style.display = 'block';
-                
+
                 const multiselectContainer = document.createElement('div');
                 multiselectContainer.className = 'multiselect-container';
                 multiselectContainer.tabIndex = 0;
@@ -311,14 +637,14 @@
                 multiselectContainer.style.alignItems = 'center';
                 multiselectContainer.style.gap = '4px';
                 multiselectContainer.style.backgroundColor = 'white';
-                
+
                 const selectedItems = document.createElement('div');
                 selectedItems.className = 'selected-items';
                 selectedItems.style.display = 'flex';
                 selectedItems.style.flexWrap = 'wrap';
                 selectedItems.style.gap = '4px';
                 selectedItems.style.flexGrow = '1';
-                
+
                 const searchInput = document.createElement('input');
                 searchInput.type = 'text';
                 searchInput.className = 'search-input';
@@ -327,11 +653,11 @@
                 searchInput.style.outline = 'none';
                 searchInput.style.flexGrow = '1';
                 searchInput.style.minWidth = '50px';
-                
+
                 const arrow = document.createElement('div');
                 arrow.className = 'dropdown-arrow';
                 arrow.style.cursor = 'pointer';
-                
+
                 const dropdown = document.createElement('div');
                 dropdown.className = 'options-dropdown';
                 dropdown.style.position = 'absolute';
@@ -346,29 +672,29 @@
                 dropdown.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
                 dropdown.style.zIndex = '1000';
                 dropdown.style.display = 'none';
-                
+
                 // Assemble structure
                 selectedItems.appendChild(searchInput);
                 multiselectContainer.appendChild(selectedItems);
                 multiselectContainer.appendChild(arrow);
                 container.appendChild(multiselectContainer);
                 container.appendChild(dropdown);
-                
+
                 // Insert after original select and hide original
                 select.parentNode.insertBefore(container, select.nextSibling);
                 select.style.display = 'none';
-                
+
                 let selectedValues = new Set();
                 let isOpen = false;
-                
+
                 function updateSelectedDisplay() {
                     // Update selectedValues from the actual select element
                     selectedValues = new Set(Array.from(select.selectedOptions).map(opt => opt.value));
-                    
+
                     // Clear current display except search input
                     const tags = selectedItems.querySelectorAll('.selected-tag');
                     tags.forEach(tag => tag.remove());
-                    
+
                     // Add selected items as tags
                     selectedValues.forEach(value => {
                         const option = options.find(opt => opt.value === value);
@@ -382,25 +708,25 @@
                             selectedItems.insertBefore(tag, searchInput);
                         }
                     });
-                    
+
                     // Show placeholder if no selections
                     if (selectedValues.size === 0) {
                         searchInput.placeholder = 'Type to search...';
                     } else {
                         searchInput.placeholder = '';
                     }
-                    
+
                     // **CRITICAL FIX**: Trigger pivot generation after selection changes
                     generatePivot();
                 }
 
                 function filterOptions(searchTerm = '') {
                     dropdown.innerHTML = '';
-                    
+
                     const filteredOptions = options.filter(opt =>
                         opt.text.toLowerCase().includes(searchTerm.toLowerCase())
                     );
-                    
+
                     if (filteredOptions.length === 0) {
                         const noOptions = document.createElement('div');
                         noOptions.className = 'no-options';
@@ -408,23 +734,23 @@
                         dropdown.appendChild(noOptions);
                         return;
                     }
-                    
+
                     filteredOptions.forEach(option => {
                         const item = document.createElement('div');
                         item.className = 'option-item';
                         if (selectedValues.has(option.value)) {
                             item.classList.add('selected');
                         }
-                        
+
                         item.innerHTML = `
                             <input type="checkbox" class="option-checkbox" ${selectedValues.has(option.value) ? 'checked' : ''}>
                             <span>${option.text}</span>
                         `;
-                        
+
                         item.addEventListener('click', (e) => {
                             e.preventDefault();
                             const checkbox = item.querySelector('.option-checkbox');
-                            
+
                             if (selectedValues.has(option.value)) {
                                 selectedValues.delete(option.value);
                                 checkbox.checked = false;
@@ -434,20 +760,20 @@
                                 checkbox.checked = true;
                                 item.classList.add('selected');
                             }
-                            
+
                             // Update the original select element
                             Array.from(select.options).forEach(opt => {
                                 opt.selected = selectedValues.has(opt.value);
                             });
-                            
+
                             updateSelectedDisplay();
                             applyFilter(); // Apply filter on selection change
                         });
-                        
+
                         dropdown.appendChild(item);
                     });
                 }
-                
+
                 // Attach functions to the original select element for external access
                 select._updateCustomDisplay = updateSelectedDisplay;
                 select._filterOptions = filterOptions;
@@ -461,7 +787,7 @@
                         searchInput.focus();
                     }
                 }
-                
+
                 function closeDropdown() {
                     if (isOpen) {
                         isOpen = false;
@@ -470,14 +796,14 @@
                         searchInput.value = '';
                     }
                 }
-                
+
                 // Event listeners
                 multiselectContainer.addEventListener('click', (e) => {
                     if (e.target === multiselectContainer || e.target.classList.contains('selected-items')) {
                         openDropdown();
                     }
                 });
-                
+
                 searchInput.addEventListener('input', (e) => {
                     if (!isOpen && e.target.value.length > 0) {
                         openDropdown();
@@ -486,7 +812,7 @@
                     }
                     filterOptions(e.target.value);
                 });
-                
+
                 searchInput.addEventListener('focus', () => {
                     if (options.length > 0 || isOpen) {
                         openDropdown();
@@ -501,31 +827,31 @@
                     if (e.target.classList.contains('tag-remove')) {
                         const value = e.target.dataset.value;
                         selectedValues.delete(value);
-                        
+
                         // **CRITICAL FIX**: Update the original select element
                         Array.from(select.options).forEach(opt => {
                             if (opt.value === value) {
                                 opt.selected = false;
                             }
                         });
-                        
+
                         updateSelectedDisplay();
                         applyFilter();
-                        
+
                         // Update dropdown if open
                         if (isOpen) {
                             filterOptions(searchInput.value);
                         }
                     }
                 });
-                
+
                 // Close dropdown when clicking outside
                 document.addEventListener('click', (e) => {
                     if (!container.contains(e.target)) {
                         closeDropdown();
                     }
                 });
-                
+
                 // Keyboard navigation
                 multiselectContainer.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -537,15 +863,14 @@
                         closeDropdown();
                     }
                 });
-                
+
                 // Initial call for this specific select element
                 updateSelectedDisplay();
                 filterOptions();
             });
         }
-        
+
         let originalData = null;
-        let filteredData = null; // Holds data after activeFilters are applied
         let currentData = null;  // Holds data after both activeFilters and catalog number selection
         let currentPivotData = null;
         let currentCharts = []; // Array to hold multiple chart instances
@@ -563,7 +888,7 @@
         function updateAvailableFields() {
             if (currentData.length === 0) return;
 
-            const fields = Object.keys(currentData);
+            const fields = Object.keys(currentData[0]);
             const fieldSelects = document.querySelectorAll('.field-select');
             const facetSelect = document.getElementById('facet-field');
 
@@ -576,7 +901,7 @@
                     selectElement.appendChild(option);
                 });
             });
-            
+
             // Update facet field select
             facetSelect.innerHTML = '<option value="">None</option>';
             fields.forEach(field => {
@@ -589,7 +914,7 @@
                 facetField = this.value;
                 updateChart();
             };
-            
+
             populateFilterFields();
             convertMultiSelectToAutocomplete();
         }
@@ -598,7 +923,7 @@
             const filterFieldSelect = document.getElementById('filter-field');
             filterFieldSelect.innerHTML = '<option value="">Select Field</option>';
             const allowedFields = ['StrykerGroupRegion', 'Area', 'Region', 'Country', 'Business Sector', 'Business Unit', 'Franchise', 'Product Line', 'IBP Level 5', 'IBP Level 6', 'IBP Level 7','CatalogNumber','birch','cluster', 'forecast_date', 'forecast_horizon', 'model_type', 'data_type'];
-            
+
             allowedFields.forEach(field => {
                 const option = document.createElement('option');
                 option.value = field;
@@ -655,7 +980,7 @@
             });
             return Array.from(values).sort();
         }
-        
+
         function clearFilters() {
             activeFilters = [];
             filterData();
@@ -715,14 +1040,14 @@
                 }
             });
         });
-        
+
         // Then apply catalog number selection to filteredData -> currentData
         if (selectedCatalogNumbers.length > 0) {
             currentData = filteredData.filter(row => selectedCatalogNumbers.includes(row.CatalogNumber));
         } else {
             currentData = [...filteredData];
         }
-        
+
         updateRawDataView();
         generatePivot();
         renderCatalogNumberTable();
@@ -760,7 +1085,7 @@
 
         function updateRawDataView() {
             const rawOutput = document.getElementById('raw-data-output');
-            
+
             if (currentData.length === 0) {
                 rawOutput.innerHTML = `
                     <div class="empty-state">
@@ -778,15 +1103,15 @@
             const startIndex = (currentPage - 1) * rowsPerPage;
             const endIndex = Math.min(startIndex + rowsPerPage, currentData.length);
 
-            const fields = Object.keys(currentData);
+            const fields = Object.keys(currentData[0]);
             let html = '<table>';
-            
+
             html += '<tr>';
             fields.forEach(field => {
                 html += `<th>${field}</th>`;
             });
             html += '</tr>';
-            
+
             const displayData = currentData.slice(startIndex, endIndex);
             displayData.forEach(row => {
                 html += '<tr>';
@@ -797,9 +1122,9 @@
                 });
                 html += '</tr>';
             });
-            
+
             html += '</table>';
-            
+
             // Add pagination controls
             html += `<div class="pagination">
                 <span>Showing ${startIndex + 1}-${endIndex} of ${currentData.length} rows</span>
@@ -809,7 +1134,7 @@
                     <button ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">Next</button>
                 </div>
             </div>`;
-            
+
             rawOutput.innerHTML = html;
         }
 
@@ -818,11 +1143,11 @@
             // Update tab buttons
                 document.querySelectorAll('.view-tabs .tab').forEach(tab => tab.classList.remove('active'));
                 document.querySelector(`.view-tabs button[onclick="switchTab('${tabName}')"]`).classList.add('active');
-                
+
                 // Update tab content
                 document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
                 document.getElementById(tabName + '-view').classList.add('active');
-                
+
                 // If switching to chart view, update chart
                 if (tabName === 'chart' && currentPivotData) {
                     setTimeout(() => updateChart(), 100);
@@ -873,17 +1198,17 @@
                 if (draggedElement) {
                     const fieldName = draggedElement.getAttribute('data-field');
                     const targetZone = e.target.getAttribute('data-zone');
-                    
+
                     // Remove from current location
                     draggedElement.remove();
-                    
+
                     // Add to new location
                     if (targetZone === 'values') {
                         addFieldToValues(fieldName, e.target);
                     } else {
                         addFieldToZone(fieldName, e.target);
                     }
-                    
+
                     draggedElement = null;
                     generatePivot(); // Trigger pivot table generation after drop
                 }
@@ -895,11 +1220,11 @@
                 newField.draggable = true;
                 newField.setAttribute('data-field', fieldName);
                 newField.textContent = fieldName;
-                
+
                 // Add event listeners
                 newField.addEventListener('dragstart', handleDragStart);
                 newField.addEventListener('dragend', handleDragEnd);
-                
+
                 targetZone.appendChild(newField);
                 generatePivot(); // Trigger pivot table generation after adding field
             }
@@ -909,7 +1234,7 @@
                 newField.className = 'field-item';
                 newField.draggable = true;
                 newField.setAttribute('data-field', fieldName);
-                
+
                 // Add aggregation selector for value fields
                 const select = document.createElement('select');
                 select.className = 'aggregation-select';
@@ -920,15 +1245,15 @@
                     <option value="min">Min</option>
                     <option value="max">Max</option>
                 `;
-                
+
                 newField.innerHTML = `${fieldName} `;
                 newField.appendChild(select);
-                
+
                 // Add event listeners
                 newField.addEventListener('dragstart', handleDragStart);
                 newField.addEventListener('dragend', handleDragEnd);
                 select.addEventListener('change', generatePivot); // Add this line
-                
+
                 targetZone.appendChild(newField);
                 generatePivot(); // Trigger pivot table generation after adding value field
             }
@@ -938,10 +1263,17 @@
                 const columnFields = getFieldsFromZone('columns');
                 const valueFields = getFieldsFromZone('values');
 
-                currentPivotData = createPivotTable(currentData, rowFields, columnFields, valueFields);
+                // Add null check for currentData
+                if (!currentData || !Array.isArray(currentData)) {
+                    console.log('generatePivot: currentData is null or not an array');
+                    currentPivotData = createPivotTable([], rowFields, columnFields, valueFields);
+                } else {
+                    currentPivotData = createPivotTable(currentData, rowFields, columnFields, valueFields);
+                }
+
                 renderPivotTable(currentPivotData, rowFields, columnFields, valueFields);
                 generateMetrics(currentPivotData, rowFields, columnFields, valueFields);
-                
+
                 // Update chart if chart tab is active
                 if (document.getElementById('chart-view').classList.contains('active')) {
                     updateChart();
@@ -951,7 +1283,7 @@
             function getFieldsFromZone(zone) {
                 const zoneElement = document.getElementById(`${zone === 'rows' ? 'row' : zone === 'columns' ? 'column' : 'value'}-fields`);
                 const fields = [];
-                
+
                 if (zoneElement && zoneElement.tagName === 'SELECT') {
                     Array.from(zoneElement.selectedOptions).forEach(option => {
                         const field = option.value;
@@ -963,14 +1295,24 @@
                         }
                     });
                 }
-                
+
                 return fields;
             }
 
             function createPivotTable(data, rowFields, columnFields, valueFields) {
+                // Add null check to prevent the TypeError
+                if (!data || !Array.isArray(data) || data.length === 0) {
+                    console.log('createPivotTable: No data available for pivot table generation');
+                    return {
+                        data: {},
+                        columnValues: [],
+                        rowKeys: []
+                    };
+                }
+
                 const pivot = {};
                 const columnValues = new Set();
-                
+
                 // Collect all unique column values
                 if (columnFields.length > 0) {
                     data.forEach(row => {
@@ -983,23 +1325,23 @@
                 data.forEach(row => {
                     const rowKey = rowFields.length > 0 ? rowFields.map(field => row[field]).join(' | ') : 'Total';
                     const colKey = columnFields.length > 0 ? columnFields.map(field => row[field]).join(' | ') : 'Total';
-                    
+
                     if (!pivot[rowKey]) {
                         pivot[rowKey] = {};
                     }
-                    
+
                     if (!pivot[rowKey][colKey]) {
                         pivot[rowKey][colKey] = {};
                     }
-                    
+
                     valueFields.forEach(valueField => {
                         const {field, aggregation} = valueField;
                         const key = `${field}_${aggregation}`;
-                        
+
                         if (!pivot[rowKey][colKey][key]) {
                             pivot[rowKey][colKey][key] = [];
                         }
-                        
+
                         pivot[rowKey][colKey][key].push(row[field]);
                     });
                 });
@@ -1010,7 +1352,7 @@
                         Object.keys(pivot[rowKey][colKey]).forEach(valueKey => {
                             const values = pivot[rowKey][colKey][valueKey];
                             const aggregation = valueKey.split('_');
-                            
+
                             pivot[rowKey][colKey][valueKey] = calculateAggregation(values, aggregation);
                         });
                     });
@@ -1042,15 +1384,15 @@
 
             function renderPivotTable(pivotData, rowFields, columnFields, valueFields) {
                 const outputDiv = document.getElementById('pivot-output');
-                
+
                 let html = '<div class="pivot-table"><table>';
-                
+
                 // Header row
                 html += '<tr>';
                 if (rowFields.length > 0) {
                     html += `<th>${rowFields.join(' / ')}</th>`;
                 }
-                
+
                 if (columnFields.length === 0) {
                     valueFields.forEach(vf => {
                         html += `<th>${vf.field} (${vf.aggregation})</th>`;
@@ -1063,14 +1405,14 @@
                     });
                 }
                 html += '</tr>';
-                
+
                 // Data rows
                 pivotData.rowKeys.forEach(rowKey => {
                     html += '<tr>';
                     if (rowFields.length > 0) {
                         html += `<td><strong>${rowKey}</strong></td>`;
                     }
-                    
+
                     if (columnFields.length === 0) {
                         valueFields.forEach(vf => {
                             const key = `${vf.field}_${vf.aggregation}`;
@@ -1088,14 +1430,14 @@
                     }
                     html += '</tr>';
                 });
-                
+
                 html += '</table></div>';
                 outputDiv.innerHTML = html;
             }
 
             function generateMetrics(pivotData, rowFields, columnFields, valueFields) {
                 const metricsGrid = document.getElementById('metrics-grid');
-                
+
                 if (!pivotData || valueFields.length === 0) {
                     metricsGrid.innerHTML = `
                         <div class="empty-state">
@@ -1107,7 +1449,7 @@
                 }
 
                 let html = '';
-                
+
                 // Group data by SALES_DATE for QoQ calculations (quarterly)
                 const salesDataByQuarter = {};
                 // Group data by SALES_DATE for YoY calculations (yearly)
@@ -1121,7 +1463,7 @@
                         const month = date.getMonth(); // 0-11
                         const quarter = Math.floor(month / 3) + 1;
                         const yearQuarter = `${year}-Q${quarter}`;
-                        
+
                         // For QoQ
                         if (!salesDataByQuarter[yearQuarter]) {
                             salesDataByQuarter[yearQuarter] = {};
@@ -1159,7 +1501,7 @@
 
                 valueFields.forEach(vf => {
                     const field = vf.field;
-                    
+
                     // QoQ Table
                     html += `<div class="pivot-table"><table>`;
                     html += `<h3 style="padding-left:20px;font-weight:500;">${field} (${vf.aggregation}) QoQ Growth</h3>`;
@@ -1184,7 +1526,7 @@
                             const prevQY = `${prevQuarterYear}-Q${prevQuarter}`;
                             const prevValue = salesDataByQuarter[prevQY] && salesDataByQuarter[prevQY][field] ?
                                               calculateAggregation(salesDataByQuarter[prevQY][field], vf.aggregation) : 0;
-                            
+
                             if (prevValue !== 0) {
                                 qoqGrowth = (((currentValue - prevValue) / prevValue) * 100).toFixed(2) + '%';
                             } else if (currentValue !== 0) {
@@ -1218,7 +1560,7 @@
                             const prevYear = parseInt(currentYear) - 1;
                             const prevYearValue = salesDataByYear[prevYear] && salesDataByYear[prevYear][field] ?
                                                   calculateAggregation(salesDataByYear[prevYear][field], vf.aggregation) : 0;
-                            
+
                             if (prevYearValue !== 0) {
                                 yoyGrowth = (((currentValue - prevYearValue) / prevYearValue) * 100).toFixed(2) + '%';
                             } else if (currentValue !== 0) {
@@ -1238,29 +1580,29 @@
                     });
                     html += `</table></div>`;
                 });
-                
+
                 metricsGrid.innerHTML = html;
             }
 
             function updateChart() {
                 const chartContainer = document.getElementById('chart-container');
                 chartContainer.innerHTML = ''; // Clear existing charts
-                
+
                 // Destroy any existing charts
                 currentCharts.forEach(chart => chart.destroy());
                 currentCharts = [];
                 if (!currentPivotData) return;
-                
+
                 const chartType = document.getElementById('chart-type').value;
                 const maxCharts = parseInt(document.getElementById('chart-limit').value) || 10;
-                
+
                 if (!facetField) {
                     // No facet - single chart
                     const canvas = document.createElement('canvas');
                     canvas.width = 400;
                     canvas.height = 200;
                     chartContainer.appendChild(canvas);
-                    
+
                     const ctx = canvas.getContext('2d');
                     const chartData = prepareChartData(currentPivotData);
                     const config = createChartConfig(chartType, chartData);
@@ -1268,29 +1610,29 @@
                 } else {
                     // Facet charts - but only create charts for facet values that have data after filtering
                     let uniqueFacetValues = [];
-                    
+
                     // Get unique facet values only from the filtered data
                     if (currentData && currentData.length > 0) {
                         uniqueFacetValues = [...new Set(currentData.map(row => row[facetField].toString()))];
                     }
-                    
+
                     // Limit to max charts
                     uniqueFacetValues = uniqueFacetValues.slice(0, maxCharts);
-                    
+
                     // Only create charts for facet values that have data
                     uniqueFacetValues.forEach(facetValue => {
                         const facetData = currentData.filter(row => row[facetField].toString() === facetValue);
-                        
+
                         // Only create chart if there's data for this facet value
                         if (facetData.length > 0) {
                             const pivotData = createPivotTable(facetData,
                                 getFieldsFromZone('rows'),
                                 getFieldsFromZone('columns'),
                                 getFieldsFromZone('values'));
-                            
+
                             const chartDiv = document.createElement('div');
                             chartDiv.className = 'facet-chart';
-                            
+
                             const chartWrapper = document.createElement('div');
                             chartWrapper.style.width = '450px';
                             chartWrapper.style.height = '400px';
@@ -1300,9 +1642,9 @@
                             const canvas = document.createElement('canvas');
                             chartWrapper.appendChild(canvas);
                             chartDiv.appendChild(chartWrapper);
-                            
+
                             chartContainer.appendChild(chartDiv);
-                            
+
                             const ctx = canvas.getContext('2d');
                             const chartData = prepareChartData(pivotData);
                             const config = createChartConfig(chartType, chartData, `${facetField}: ${facetValue}`);
@@ -1311,7 +1653,7 @@
                     });
                 }
             }
-            
+
             function createChartConfig(chartType, chartData, title='Pivot Data Visualization') {
                 return {
                     type: chartType,
@@ -1344,7 +1686,7 @@
 
             function prepareChartData(pivotData) {
                 if (!pivotData) return { labels: [], datasets: [] };
-                
+
                 const columnFields = getFieldsFromZone('columns');
                 const valueFields = getFieldsFromZone('values');
                 const labels = pivotData.rowKeys.map(label => {
@@ -1357,21 +1699,21 @@
             return label; // Return original label if not a valid date
         });
                 const datasets = [];
-                
+
                 if (columnFields.length === 0) {
                     valueFields.forEach((vf, index) => {
                         const key = `${vf.field}_${vf.aggregation}`;
                         const data = pivotData.rowKeys.map(rowKey => {
                             return pivotData.data[rowKey]['Total']?.[key] || 0;
                         });
-                        
+
                         // For forecast fields, use a more descriptive label
                         let label = `${vf.field} (${vf.aggregation})`;
                         if (vf.field.startsWith('forecast_')) {
                             const modelName = vf.field.replace('forecast_', '');
                             label = `${modelName} Forecast`;
                         }
-                        
+
                         datasets.push({
                             label: label,
                             data: data,
@@ -1387,14 +1729,14 @@
                             const data = pivotData.rowKeys.map(rowKey => {
                                 return pivotData.data[rowKey]?.[colValue]?.[key] || 0;
                             });
-                            
+
                             // For forecast fields, use a more descriptive label
                             let label = `${colValue} - ${vf.field} (${vf.aggregation})`;
                             if (vf.field.startsWith('forecast_')) {
                                 const modelName = vf.field.replace('forecast_', '');
                                 label = `${colValue} - ${modelName} Forecast`;
                             }
-                            
+
                             datasets.push({
                                 label: label,
                                 data: data,
@@ -1405,7 +1747,7 @@
                         });
                     });
                 }
-                
+
                 return { labels, datasets };
             }
 
@@ -1422,11 +1764,11 @@
                     `rgba(199, 199, 199, ${alpha})`,
                     `rgba(83, 102, 255, ${alpha})`
                 ];
-                
+
                 //if (count === 1) {
                 //    return colors.slice(0, 10);
                 //}
-                
+
                 return colors[index % colors.length];
             }
 
@@ -1480,7 +1822,7 @@
                 const catalogNumber = event.target.getAttribute('data-catalog-number');
                 const index = selectedCatalogNumbers.indexOf(catalogNumber);
                 const isCtrlPressed = event.ctrlKey || event.metaKey; // metaKey for Mac
-                
+
                 // If Ctrl/Cmd is not pressed, clear all selections first
                 if (!isCtrlPressed) {
                     // Clear all selections except the one being clicked
@@ -1491,7 +1833,7 @@
                     });
                     selectedCatalogNumbers = [];
                 }
-                
+
                 // Toggle the clicked item
                 if (index === -1) {
                     selectedCatalogNumbers.push(catalogNumber);
@@ -1503,7 +1845,7 @@
                         event.target.classList.remove('selected');
                     }
                 }
-                
+
                 filterData();
             }
             function resetCatalogNumberFilter() {
@@ -1517,7 +1859,7 @@
 
             function clearAll() {
                 const zones = ['row-fields', 'column-fields', 'value-fields'];
-                
+
                 zones.forEach(zoneId => {
                     const selectElement = document.getElementById(zoneId);
                     if (selectElement && selectElement.tagName === 'SELECT') {
@@ -1530,12 +1872,12 @@
                         }
                     }
                 });
-                
+
                 // Reset facet field
                 const facetSelect = document.getElementById('facet-field');
                 facetSelect.value = '';
                 facetField = null;
-                
+
                 // Clear outputs
                 document.getElementById('pivot-output').innerHTML = `
                     <div class="empty-state">
@@ -1543,14 +1885,14 @@
                         <p>Select fields from the dropdowns in the Rows, Columns, or Values sections and click "Generate Analysis" to start analyzing your data.</p>
                     </div>
                 `;
-                
+
                 document.getElementById('metrics-grid').innerHTML = `
                     <div class="empty-state">
                         <h3>No Metrics Available</h3>
                         <p>Generate a pivot table first to see key metrics.</p>
                     </div>
                 `;
-                
+
                 // Destroy all charts
                 currentCharts.forEach(chart => chart.destroy());
                 currentCharts = [];
@@ -1563,19 +1905,19 @@
                     alert('Generate a pivot table first to export data.');
                     return;
                 }
-                
+
                 const rowFields = getFieldsFromZone('rows');
                 const columnFields = getFieldsFromZone('columns');
                 const valueFields = getFieldsFromZone('values');
-                
+
                 let csvContent = '';
-                
+
                 // Header row
                 const headers = [];
                 if (rowFields.length > 0) {
                     headers.push(rowFields.join(' / '));
                 }
-                
+
                 if (columnFields.length === 0) {
                     valueFields.forEach(vf => {
                         headers.push(`${vf.field} (${vf.aggregation})`);
@@ -1587,16 +1929,16 @@
                         });
                     });
                 }
-                
+
                 csvContent += headers.join(',') + '\n';
-                
+
                 // Data rows
                 currentPivotData.rowKeys.forEach(rowKey => {
                     const row = [];
                     if (rowFields.length > 0) {
                         row.push(`"${rowKey}"`);
                     }
-                    
+
                     if (columnFields.length === 0) {
                         valueFields.forEach(vf => {
                             const key = `${vf.field}_${vf.aggregation}`;
@@ -1612,10 +1954,10 @@
                             });
                         });
                     }
-                    
+
                     csvContent += row.join(',') + '\n';
                 });
-                
+
                 // Download CSV
                 const blob = new Blob([csvContent], { type: 'text/csv' });
                 const url = window.URL.createObjectURL(blob);
@@ -1666,34 +2008,34 @@
                     alert('Invalid data provided. Please provide an array of objects.');
                     return;
                 }
-                
+
                 // Show loading indicator
                 const loadingIndicator = document.createElement('div');
                 loadingIndicator.className = 'loading-indicator';
                 loadingIndicator.innerHTML = '<p>Loading data...</p><div class="progress-bar"><div class="progress"></div></div>';
                 document.body.appendChild(loadingIndicator);
-                
+
                 // Process data in chunks to avoid UI freezing
                 originalData = data;
-                
+
                 // Use setTimeout to allow UI to update before processing
                 setTimeout(() => {
                     // Process in background
                     filteredData = [...originalData];
                     currentData = [...originalData];
-                    
+
                     // Update UI
                     updateAvailableFields();
                     clearAll();
                     clearFilters();
-                    
+
                     // Remove loading indicator
                     document.body.removeChild(loadingIndicator);
-                    
+
                     // Update views
                     updateRawDataView();
                     renderCatalogNumberTable();
-                    
+
                     // Set default selections
                     const rowFieldsSelect = document.getElementById('row-fields');
                     const columnFieldsSelect = document.getElementById('column-fields');
@@ -1747,14 +2089,14 @@
                             s._updateCustomDisplay();
                         }
                     });
-                    
+
                     generatePivot(); // Generate pivot table with default values
                 }, 100);
             }
 
             // Expose the function globally for external calls (e.g., from parent window or other scripts)
             window.loadPivotData = loadDataProgrammatically;
-            
+
             // Forecast functionality
             function loadForecastData() {
                 const horizon = document.getElementById('forecast-horizon').value;
@@ -1779,7 +2121,7 @@
                                 forecastColumns.push(key);
                             }
                         });
-                        
+
                         // Create a summary of forecast data for display
                         forecastData = [];
                         currentData.forEach(row => {
@@ -1805,7 +2147,7 @@
 
                     updateForecastTable(forecastData);
                     updateForecastSummary(forecastData);
-                    
+
                     // Refresh pivot table and charts
                     if (currentData.length > 0) {
                         currentPivotData = createPivotTable(
@@ -1814,7 +2156,7 @@
                             getFieldsFromZone('columns'),
                             getFieldsFromZone('values')
                         );
-                        
+
                         // Update chart if chart tab is active
                         if (document.getElementById('chart-view').classList.contains('active')) {
                             updateChart();
@@ -1822,7 +2164,7 @@
                     }
                 }, 500);
             }
-            
+
             function updateForecastTable(data) {
                 const tableBody = document.getElementById('forecast-table-body');
 
@@ -1851,7 +2193,7 @@
 
                 tableBody.innerHTML = html;
             }
-            
+
             function updateForecastSummary(data) {
                 if (!data || data.length === 0) {
                     document.getElementById('total-forecasts').textContent = '0';
@@ -1860,30 +2202,30 @@
                     document.getElementById('avg-forecast-value').textContent = '0';
                     return;
                 }
-                
+
                 const total = data.length;
                 const approved = data.filter(d => d.is_current).length;
                 const avgValue = data.reduce((sum, d) => sum + (d.forecast_value || 0), 0) / data.length;
-                
+
                 document.getElementById('total-forecasts').textContent = total;
                 document.getElementById('approved-forecasts').textContent = approved;
                 document.getElementById('current-cycle').textContent = new Date().toLocaleDateString();
                 document.getElementById('avg-forecast-value').textContent = formatValue(avgValue);
             }
-            
+
             function exportForecastData() {
                 const table = document.getElementById('forecast-table');
                 if (!table) {
                     alert('No forecast data to export');
                     return;
                 }
-                
+
                 let csvContent = '';
-                
+
                 // Get headers
                 const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent);
                 csvContent += headers.join(',') + '\n';
-                
+
                 // Get data rows
                 const rows = table.querySelectorAll('tbody tr');
                 rows.forEach(row => {
@@ -1897,7 +2239,7 @@
                     });
                     csvContent += cells.join(',') + '\n';
                 });
-                
+
                 // Download CSV
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                 const url = window.URL.createObjectURL(blob);
@@ -1907,15 +2249,15 @@
                 a.click();
                 window.URL.revokeObjectURL(url);
             }
-            
+
             // Validation functionality
             function runModelValidation() {
                 const period = document.getElementById('validation-period').value;
-                
+
                 // Show loading state
                 const tableBody = document.getElementById('validation-table-body');
                 tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;"><div>Running model validation...</div></td></tr>';
-                
+
                 // This would typically make an API call to run validation
                 // For now, we'll simulate with sample data
                 setTimeout(() => {
@@ -1945,21 +2287,21 @@
                             accuracy_percentage: 87.9
                         }
                     ];
-                    
+
                     updateValidationTable(sampleData);
                     updateValidationSummary(sampleData);
                     updateValidationChart(sampleData);
                 }, 2000);
             }
-            
+
             function updateValidationTable(data) {
                 const tableBody = document.getElementById('validation-table-body');
-                
+
                 if (!data || data.length === 0) {
                     tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: #666;">No validation data available</td></tr>';
                     return;
                 }
-                
+
                 let html = '';
                 data.forEach(row => {
                     html += `
@@ -1973,10 +2315,10 @@
                         </tr>
                     `;
                 });
-                
+
                 tableBody.innerHTML = html;
             }
-            
+
             function updateValidationSummary(data) {
                 if (!data || data.length === 0) {
                     document.getElementById('best-model').textContent = 'N/A';
@@ -1985,28 +2327,28 @@
                     document.getElementById('overall-accuracy').textContent = '0%';
                     return;
                 }
-                
-                const bestModel = data.reduce((best, current) => 
+
+                const bestModel = data.reduce((best, current) =>
                     current.accuracy_percentage > best.accuracy_percentage ? current : best
                 );
-                
+
                 const avgMape = data.reduce((sum, d) => sum + d.mape, 0) / data.length;
                 const avgRmse = data.reduce((sum, d) => sum + d.rmse, 0) / data.length;
                 const avgAccuracy = data.reduce((sum, d) => sum + d.accuracy_percentage, 0) / data.length;
-                
+
                 document.getElementById('best-model').textContent = bestModel.model_type;
                 document.getElementById('avg-mape').textContent = `${avgMape.toFixed(1)}%`;
                 document.getElementById('avg-rmse').textContent = formatValue(avgRmse);
                 document.getElementById('overall-accuracy').textContent = `${avgAccuracy.toFixed(1)}%`;
             }
-            
+
             function updateValidationChart(data) {
                 const ctx = document.getElementById('validationChart').getContext('2d');
-                
+
                 const labels = data.map(d => d.model_type);
                 const accuracyData = data.map(d => d.accuracy_percentage);
                 const mapeData = data.map(d => d.mape);
-                
+
                 new Chart(ctx, {
                     type: 'bar',
                     data: {
@@ -2036,20 +2378,20 @@
                     }
                 });
             }
-            
+
             function exportValidationReport() {
                 const table = document.getElementById('validation-table');
                 if (!table) {
                     alert('No validation data to export');
                     return;
                 }
-                
+
                 let csvContent = '';
-                
+
                 // Get headers
                 const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent);
                 csvContent += headers.join(',') + '\n';
-                
+
                 // Get data rows
                 const rows = table.querySelectorAll('tbody tr');
                 rows.forEach(row => {
@@ -2062,7 +2404,7 @@
                     });
                     csvContent += cells.join(',') + '\n';
                 });
-                
+
                 // Download CSV
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                 const url = window.URL.createObjectURL(blob);
@@ -2072,35 +2414,7 @@
                 a.click();
                 window.URL.revokeObjectURL(url);
             }
-            
-            // Handle template data - this will be replaced by actual data when rendered
-            (function() {
-                try {
-                    // Use Jinja's tojson filter for safe JSON output
-                    const templateData = JSON.parse('{{ df_json | safe }}');
-                    if (Array.isArray(templateData) && templateData.length > 0) {
-                        window.loadPivotData(templateData);
-                    } else {
-                        // Show message that no data is available but provide option to continue
-                        const rawOutput = document.getElementById('raw-data-output');
-                        if (rawOutput) {
-                            rawOutput.innerHTML = `
-                                <div class="empty-state">
-                                    <h3>No Filtered Data Available</h3>
-                                    <p>No data was found in the filtered dataset from the dashboard.</p>
-                                    <p>You can still use this page to explore data analysis tools.</p>
-                                </div>
-                            `;
-                        }
-                        
-                        // Update available fields to show message or load minimal dataset
-                        updateAvailableFields();
-                    }
-                } catch (e) {
-                    console.log('Template data not available or invalid JSON, waiting for external data load', e);
-                }
-            })();
-            
+
             // Initialize the app
             document.addEventListener('DOMContentLoaded', function() {
                 // Ensure conversion happens after the DOM is ready and initial data might be loaded

@@ -40,16 +40,37 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # Import routes
-from routes import dashboard, api
+from routes import dashboard, api, api_raw_data
 
 # Include routes
 app.include_router(dashboard.router)
 app.include_router(api.router)
+app.include_router(api_raw_data.router)
 
 # Add a route for the agent page
 @app.get("/agent", response_class=HTMLResponse)
 async def agent_page(request: Request):
     return templates.TemplateResponse("agent.html", {"request": request})
+
+@app.get("/raw_data", response_class=HTMLResponse)
+async def raw_data_page(request: Request):
+    """Raw data page"""
+    from core.db_service import get_database_service
+    db_service = get_database_service()
+    filter_options = db_service.get_filter_options(user_id="system")
+
+    initial_location_options = ["Region", "Country", "Area"]
+    initial_product_options = ["Franchise", "IBP Level 5", "IBP Level 6", "CatalogNumber"]
+
+    context = {
+        "request": request,
+        "initial_location_options": initial_location_options,
+        "initial_product_options": initial_product_options,
+        "location_options": filter_options.get('regions', []),
+        "product_options": filter_options.get('franchises', []),
+        "all_filter_options": filter_options  # Add all filter options for complete functionality
+    }
+    return templates.TemplateResponse("raw_data.html", context)
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):

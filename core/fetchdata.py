@@ -31,7 +31,7 @@ def _load_credentials():
     # Get the project root directory (two levels up from core)
     from pathlib import Path
     project_root = Path(__file__).parent.parent
-    credentials_file = project_root / "config" / "credentials.json"
+    credentials_file = project_root / "credentials.json"
     
     # Load credentials from file
     with open(credentials_file, 'r') as f:

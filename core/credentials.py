@@ -21,26 +21,13 @@ class CredentialsManager:
     
     def _load_credentials(self):
         """Load credentials from secure configuration file."""
-        try:
-            # Look for credentials file in config directory
-            config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config')
-            credentials_file = os.path.join(config_dir, 'credentials.json')
-            
-            if os.path.exists(credentials_file):
-                with open(credentials_file, 'r') as f:
-                    self._credentials = json.load(f)
-            else:
-                # Initialize with empty credentials
-                self._credentials = {
-                    'database': {
-                        'server': '',
-                        'database_name': '',
-                        'username': '',
-                        'password': ''
-                    }
-                }
-        except Exception as e:
-            print(f"Warning: Could not load credentials file: {e}")
+        credentials_file = 'credentials.json'
+        
+        if os.path.exists(credentials_file):
+            with open(credentials_file, 'r') as f:
+                self._credentials = json.load(f)
+        else:
+            # Initialize with empty credentials
             self._credentials = {
                 'database': {
                     'server': '',

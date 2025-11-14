@@ -16,6 +16,9 @@ graph TD
     subgraph Backend["Backend (FastAPI)"]
         B -- State/DB Access --> C(Core Services)
         B -- Forecasting Logic --> D(Forecasting Module)
+    end
+
+    subgraph Enhancement["Enhancement"]
         B -- AI Agent --> E(Local LLM/ Web Search)
     end
 
@@ -46,6 +49,7 @@ graph TD
     style CoreServices fill:#ddf,stroke:#333,stroke-width:2px
     style ForecastingModule fill:#cfc,stroke:#333,stroke-width:2px
     style DataLayer fill:#ffc,stroke:#333,stroke-width:2px
+    style Enhancement fill:#ffd,stroke:#333,stroke-width:2px
     style Database fill:#ffe,stroke:#333,stroke-width:2px
 ```
 

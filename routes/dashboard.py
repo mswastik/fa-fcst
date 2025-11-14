@@ -54,28 +54,3 @@ async def dashboard(request: Request):
         "initial_product_options": initial_product_options
     })
 
-@router.get("/raw_data", response_class=HTMLResponse)
-async def raw_data_page(request: Request):
-    """Raw data page showing combined sales and forecast data"""
-    session_id = request.session.get('session_id')
-    if not session_id:
-        session_id = f"session_{len(state_service.sessions) + 1}"
-        request.session['session_id'] = session_id
-    
-    session = state_service.get_or_create_session(session_id)
-    
-    # Only load filtered data that was applied in the root page instead of full dataset
-    # to avoid memory issues with large datasets
-    df_json = []
-    if session.filtered_df is not None and not session.filtered_df.is_empty():
-        # Use filtered data from the dashboard if available
-        # Convert to dictionaries first
-        df_json = session.filtered_df.to_dicts()
-    # If no filtered data is available, return empty array to avoid loading full dataset
-    # This will show an empty state in the UI but won't cause memory issues
-        
-    # Return the template with the data as a JSON string
-    return templates.TemplateResponse("raw_data.html", {
-        "request": request,
-        "df_json": json.dumps(df_json, cls=CustomJsonEncoder)
-    })
