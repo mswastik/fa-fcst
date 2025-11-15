@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from core.state_manager import DataState, get_global_state
 from core.utils import DataUtils, ErrorHandler
 from mlforecast import MLForecast
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, VotingRegressor
 from sklearn.linear_model import LinearRegression
 import xgboost as xgb
 from datetime import datetime

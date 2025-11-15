@@ -66,30 +66,43 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
     """
     from datetime import datetime, timedelta
     from dateutil.relativedelta import relativedelta
-    
+    import traceback
+
+    print("Starting fetch_and_save_sales_actuals function...")
+
     # Get database connection
     conn_manager = get_duckdb_connection_manager()
-    
+
     # Create connection if it doesn't exist
     try:
         conn = conn_manager.get_user_connection(user_id)
+        print("DuckDB connection established successfully.")
     except ValueError:
         # Connection doesn't exist, create it
+        print("Creating new DuckDB connection...")
         conn_manager.create_user_connection(user_id)
         conn = conn_manager.get_user_connection(user_id)
-    
+        print("New DuckDB connection created successfully.")
+
     # Get database connection parameters from credentials
     server, database, username, password = _get_database_connection_params()
-    
+    print(f"Obtained database connection parameters: {server}, {database}")
+
+    # Check ODBC drivers available
+    print(f"Available ODBC drivers containing 'ODBC Driver': {d}")
+    selected_driver = d[-1] if d else 'ODBC Driver 18 for SQL Server'
+    print(f"Selected driver: {selected_driver}")
+
     # Create connection string
     connection_string = (
-        f"Driver={{{d[-1] if d else 'ODBC Driver 18 for SQL Server'}}};"
+        f"Driver={{{selected_driver}}};"
         f"Server={server};database={database};"
         f"UID={username};PWD={password}"
     )
-    
+    print("Connection string created.")
+
     print("Fetching sales actuals data with bucketed approach...")
-    
+
     # Determine date range based on incremental flag
     if incremental:
         # For incremental updates: from today to 24 months ahead
@@ -101,63 +114,143 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
         start_date = datetime.today().date() - relativedelta(months=37)
         end_date = datetime.today().date() + relativedelta(months=36)
         print(f"Running full data load for date range: {start_date} to {end_date}")
-    
+
     # Calculate the total date range span in months
     total_months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
     if end_date.day < start_date.day:
         total_months -= 1  # Adjust if the day of end_date is earlier
-    
+
     # Determine bucket size (max 12 months per bucket)
     bucket_size_months = min(12, total_months)
     if bucket_size_months <= 0:
         bucket_size_months = 1
-    
+
+    print(f"Processing in buckets of {bucket_size_months} months each...")
+
     # Process data in buckets
     current_start = start_date
     processed_buckets = 0
-    
+
     # Handle deletion before inserting new data
-    if incremental:
-        # For incremental updates, delete only the overlapping period
-        conn.execute(f"""
-            DELETE FROM da.sales_actuals 
-            WHERE sales_date BETWEEN '{start_date.strftime('%Y-%m-%d')}' 
-            AND '{end_date.strftime('%Y-%m-%d')}'
-        """)
-        print(f"Deleted {start_date} to {end_date} period for incremental update")
-    else:
-        # For full data load, delete all existing data
-        conn.execute("DELETE FROM da.sales_actuals")
-        print("Deleted all existing sales_actuals data")
-    
+    try:
+        if incremental:
+            # For incremental updates, delete only the overlapping period
+            conn.execute(f"""
+                DELETE FROM da.sales_actuals
+                WHERE sales_date BETWEEN '{start_date.strftime('%Y-%m-%d')}'
+                AND '{end_date.strftime('%Y-%m-%d')}'
+            """)
+            print(f"Deleted {start_date} to {end_date} period for incremental update")
+            conn.commit()
+        else:
+            # For full data load, for very large tables we'll truncate instead of delete
+            # TRUNCATE is more efficient than DELETE for large tables in DuckDB
+            print("Truncating large table to prepare for full data load...")
+
+            # Use DROP and recreate as TRUNCATE is not available in older DuckDB versions
+            # First, store the table structure
+            table_info = conn.execute("PRAGMA table_info('da.sales_actuals');").fetchall()
+
+            # Create a backup of the table structure and recreate it
+            try:
+                # Create a new temporary table with same structure
+                conn.execute("""
+                    CREATE TABLE da.sales_actuals_new (
+                        item_skey BIGINT,
+                        location_skey BIGINT,
+                        sales_date DATE,
+                        asp_final_rev DOUBLE,
+                        act_orders_rev DOUBLE,
+                        act_orders_rev_val DOUBLE,
+                        fcst_df_final_rev DOUBLE,
+                        l0_df_final_rev DOUBLE,
+                        l1_df_final_rev DOUBLE,
+                        l2_df_final_rev DOUBLE,
+                        fcst_df_final_rev_val DOUBLE,
+                        fcst_stat_prelim_rev DOUBLE,
+                        fcst_stat_final_rev DOUBLE,
+                        l0_stat_final_rev DOUBLE,
+                        l1_stat_final_rev DOUBLE,
+                        l2_stat_final_rev DOUBLE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+
+                # Drop the old table
+                conn.execute("DROP TABLE da.sales_actuals")
+
+                # Rename the new table to the original name
+                conn.execute("ALTER TABLE da.sales_actuals_new RENAME TO sales_actuals")
+
+                print("Large table cleared successfully using recreate approach.")
+
+            except Exception as recreate_error:
+                print(f"Recreate approach failed: {recreate_error}")
+                # If recreate fails, fall back to delete in small batches
+                print("Falling back to smaller batch deletes...")
+
+                # Start with a small batch to avoid transaction issues
+                batch_count = conn.execute("""
+                    DELETE FROM da.sales_actuals
+                    WHERE ROWID IN (
+                        SELECT ROWID FROM da.sales_actuals LIMIT 10000
+                    )
+                """).fetchone()
+                conn.commit()
+
+                # Continue deleting in small batches until table is empty
+                while True:
+                    rows_deleted = conn.execute("""
+                        DELETE FROM da.sales_actuals
+                        WHERE ROWID IN (
+                            SELECT ROWID FROM da.sales_actuals LIMIT 10000
+                        )
+                    """).fetchone()
+                    rows_deleted_count = conn.execute("SELECT changes()").fetchone()[0]
+
+                    if rows_deleted_count == 0:
+                        break  # No more rows to delete
+                    conn.commit()
+
+                print("Large table cleared using small batch deletion.")
+
+        print("Deletion completed successfully.")
+    except Exception as e:
+        print(f"Error during deletion: {e}")
+        traceback.print_exc()
+        return pl.DataFrame()
+
+    print("Starting bucket processing loop...")
+
     while current_start < end_date:
         # Calculate end date for this bucket
         current_end = current_start + relativedelta(months=bucket_size_months)
-        
+
         # Make sure we don't exceed the overall end date
         if current_end > end_date:
             current_end = end_date
-        
+
         print(f"Processing bucket {processed_buckets + 1}: {current_start} to {current_end}")
-        
+
         # Create query for this bucket
         bucket_query = f'''
             SELECT
                 s.[item_skey],[Location_skey],[SALES_DATE],
-                AVG([ASP_Final_Rev]) [asp_final_rev], 
+                AVG([ASP_Final_Rev]) [asp_final_rev],
                 SUM([Act_Orders_Rev]) [act_orders_rev],
                 SUM([Act_Orders_Rev_Val]) [act_orders_rev_val],
-                SUM(Fcst_DF_Final_Rev) as [fcst_df_final_rev], 
+                SUM(Fcst_DF_Final_Rev) as [fcst_df_final_rev],
                 SUM(s."L0_DF_Final_Rev") as [l0_df_final_rev],
-                SUM(s."L1_DF_Final_Rev") as [l1_df_final_rev], 
+                SUM(s."L1_DF_Final_Rev") as [l1_df_final_rev],
                 SUM(s.[L2_DF_Final_Rev]) as [l2_df_final_rev],
                 SUM(Fcst_DF_Final_Rev_Val) as [fcst_df_final_rev_val],
                 SUM(Fcst_Stat_Prelim_Rev) as [fcst_stat_prelim_rev],
                 SUM(Fcst_Stat_Final_Rev) as [fcst_stat_final_rev],
                 SUM(s."L0_Stat_Final_Rev") as [l0_stat_final_rev],
-                SUM(s."L1_Stat_Final_Rev") as [l1_stat_final_rev], 
-                SUM(s.[L2_Stat_Final_Rev]) as [l2_stat_final_rev] 
-                
+                SUM(s."L1_Stat_Final_Rev") as [l1_stat_final_rev],
+                SUM(s.[L2_Stat_Final_Rev]) as [l2_stat_final_rev]
+
             FROM [Envision].[Demantra_CLD_Fact_Sales] s
             JOIN [Envision].[DIM_Demantra_CLD_products] p
             ON s.item_skey = p.demantra_item_skey AND p.[Current] = 'True'
@@ -166,18 +259,41 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
 
             WHERE
                 [SALES_DATE] BETWEEN '{current_start.strftime('%Y-%m-%d')}' AND '{current_end.strftime('%Y-%m-%d')}' AND
-                s.[Location_skey] IN (24,98,120)
-                
+                s.[Location_skey] IN (22,17,253)
+
             GROUP BY
                 s.[item_skey],s.[Location_skey],s.[SALES_DATE]
         '''
-        
+
         try:
             print(f"Starting to read batches for bucket {current_start} to {current_end}")
-            reader = read_arrow_batches_from_odbc(query=bucket_query, connection_string=connection_string)
+            print("Creating arrow reader...")
+
+            # Create a function that handles the ODBC connection with timeout
+            import signal
+            import threading
+            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+
+            # Using ThreadPoolExecutor to handle timeout for the ODBC call
+            def get_arrow_reader():
+                return read_arrow_batches_from_odbc(query=bucket_query, connection_string=connection_string)
+
+            print("Executing ODBC query with timeout protection...")
+
+            # Try to get the reader with a timeout of 120 seconds
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(get_arrow_reader)
+                try:
+                    reader = future.result(timeout=120)  # 2 minute timeout
+                    print("Arrow reader created successfully. Starting batch processing...")
+                except FutureTimeoutError:
+                    print("Timeout: Query execution took longer than 2 minutes, cancelling...")
+                    raise Exception("ODBC query timed out after 120 seconds")
+
             batch_count = 0
             total_rows_processed = 0
-            
+
+            # Process each batch within a transaction
             for batch in reader:
                 # Process each batch directly without accumulating in memory
                 print(f"Processing batch {batch_count + 1}")
@@ -185,13 +301,13 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
                 current_batch_rows = len(batch_df)
                 total_rows_processed += current_batch_rows
                 print(f"Batch {batch_count + 1} has {current_batch_rows} rows")
-                
+
                 # Convert SALES_DATE to proper datetime format if needed
                 if 'SALES_DATE' in batch_df.columns:
                     batch_df = batch_df.with_columns(
                         pl.col('SALES_DATE').cast(pl.Datetime).dt.replace_time_zone(None)
                     )
-                
+
                 # Prepare the data for insertion into DuckDB
                 # Rename columns to match DuckDB schema
                 rename_mapping = {
@@ -212,72 +328,89 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
                     'l1_stat_final_rev': 'l1_stat_final_rev',
                     'l2_stat_final_rev': 'l2_stat_final_rev'
                 }
-                
+
                 # Rename columns that exist in the dataframe
                 for old_name, new_name in rename_mapping.items():
                     if old_name in batch_df.columns:
                         batch_df = batch_df.rename({old_name: new_name})
-                
+
                 # Ensure numeric columns are properly typed to avoid decimal casting errors
-                numeric_columns = ['asp_final_rev', 'act_orders_rev', 'act_orders_rev_val', 
-                                  'fcst_df_final_rev', 'l0_df_final_rev', 'l1_df_final_rev', 
+                numeric_columns = ['asp_final_rev', 'act_orders_rev', 'act_orders_rev_val',
+                                  'fcst_df_final_rev', 'l0_df_final_rev', 'l1_df_final_rev',
                                   'l2_df_final_rev', 'fcst_df_final_rev_val', 'fcst_stat_prelim_rev',
-                                  'fcst_stat_final_rev', 'l0_stat_final_rev', 'l1_stat_final_rev', 
+                                  'fcst_stat_final_rev', 'l0_stat_final_rev', 'l1_stat_final_rev',
                                   'l2_stat_final_rev']
-                
+
                 for col in numeric_columns:
                     if col in batch_df.columns:
                         # Convert to float to avoid decimal precision issues
                         batch_df = batch_df.with_columns([
                             pl.col(col).cast(pl.Float64, strict=False).alias(col)
                         ])
-                
+
                 if not batch_df.is_empty():
-                    # Write this batch directly to DuckDB
-                    batch_pandas = batch_df.to_pandas()
-                    
-                    # Register the DataFrame as a temporary table
-                    conn.register("batch_pandas", batch_pandas)
-                    
-                    # Insert the data into the DuckDB table
-                    conn.execute("""
-                        INSERT INTO da.sales_actuals 
-                        (item_skey, location_skey, sales_date, asp_final_rev, act_orders_rev, act_orders_rev_val,
-                         fcst_df_final_rev, l0_df_final_rev, l1_df_final_rev, l2_df_final_rev, 
-                         fcst_df_final_rev_val, fcst_stat_prelim_rev, fcst_stat_final_rev, 
-                         l0_stat_final_rev, l1_stat_final_rev, l2_stat_final_rev, created_at, updated_at)
-                        SELECT 
-                            item_skey, location_skey, sales_date, asp_final_rev, act_orders_rev, act_orders_rev_val,
-                            fcst_df_final_rev, l0_df_final_rev, l1_df_final_rev, l2_df_final_rev, 
-                            fcst_df_final_rev_val, fcst_stat_prelim_rev, fcst_stat_final_rev, 
-                            l0_stat_final_rev, l1_stat_final_rev, l2_stat_final_rev, 
-                            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                        FROM batch_pandas
-                    """)
-                    # Unregister the temporary table
-                    conn.unregister("batch_pandas")
-                    print(f"Inserted batch {batch_count + 1} with {current_batch_rows} rows to DuckDB")
-                
+                    # Write this batch directly to DuckDB with explicit transaction management
+                    conn.execute("BEGIN TRANSACTION")
+
+                    try:
+                        batch_pandas = batch_df.to_pandas()
+
+                        # Register the DataFrame as a temporary table
+                        conn.register("batch_pandas", batch_pandas)
+
+                        # Insert the data into the DuckDB table
+                        conn.execute("""
+                            INSERT INTO da.sales_actuals
+                            (item_skey, location_skey, sales_date, asp_final_rev, act_orders_rev, act_orders_rev_val,
+                             fcst_df_final_rev, l0_df_final_rev, l1_df_final_rev, l2_df_final_rev,
+                             fcst_df_final_rev_val, fcst_stat_prelim_rev, fcst_stat_final_rev,
+                             l0_stat_final_rev, l1_stat_final_rev, l2_stat_final_rev, created_at, updated_at)
+                            SELECT
+                                item_skey, location_skey, sales_date, asp_final_rev, act_orders_rev, act_orders_rev_val,
+                                fcst_df_final_rev, l0_df_final_rev, l1_df_final_rev, l2_df_final_rev,
+                                fcst_df_final_rev_val, fcst_stat_prelim_rev, fcst_stat_final_rev,
+                                l0_stat_final_rev, l1_stat_final_rev, l2_stat_final_rev,
+                                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                            FROM batch_pandas
+                        """)
+                        # Unregister the temporary table
+                        conn.unregister("batch_pandas")
+                        print(f"Inserted batch {batch_count + 1} with {current_batch_rows} rows to DuckDB")
+
+                        # Commit the transaction
+                        conn.commit()
+                        print(f"Transaction committed for batch {batch_count + 1}")
+
+                    except Exception as batch_error:
+                        # Roll back the transaction on error
+                        conn.rollback()
+                        print(f"Error inserting batch {batch_count + 1}, transaction rolled back: {batch_error}")
+                        traceback.print_exc()
+                        # Continue to the next batch
+                        raise batch_error
+
                 batch_count += 1
-            
+                print(f"Completed processing batch {batch_count}")
+
             print(f"Retrieved data from bucket {current_start} to {current_end} in {batch_count} batches")
             print(f"Total rows processed in this bucket: {total_rows_processed}")
-            
+
             processed_buckets += 1
             print(f"Completed bucket {processed_buckets}.")
-            
+
         except Exception as e:
             print(f"Error processing bucket {current_start} to {current_end}: {e}")
-            import traceback
             traceback.print_exc()
             continue  # Continue with next bucket even if one fails
-        
+
         # Move to next bucket
         current_start = current_end + relativedelta(days=1)
-    
+        print(f"Advancing to next bucket, new start date: {current_start}")
+
     print(f"Successfully processed {processed_buckets} buckets")
-    
+
     # Return an empty DataFrame since we're now writing data directly to DuckDB
+    print("Function completed successfully!")
     return pl.DataFrame()
 
 
@@ -359,26 +492,31 @@ def fetch_and_save_product_hierarchy(user_id: str = "system"):
         # Write to DuckDB product_hierarchy table
         if not df.is_empty():
             df_pandas = df.to_pandas()
-            
+
             # First, clear existing data
             conn.execute("DELETE FROM da.product_hierarchy")
-            
+            conn.commit()  # Commit the deletion
+
             # Register the DataFrame as a temporary table
             conn.register("temp_product_hierarchy", df_pandas)
-            
+
             try:
                 # Insert the deduplicated data into the product_hierarchy table
                 conn.execute("""
-                    INSERT INTO da.product_hierarchy 
-                    (demantra_item_skey, business_sector, business_unit, franchise, product_line, 
-                     ibp_level_5, ibp_level_6, ibp_level_7, catalog_number, uom, pack_content, 
+                    INSERT INTO da.product_hierarchy
+                    (demantra_item_skey, business_sector, business_unit, franchise, product_line,
+                     ibp_level_5, ibp_level_6, ibp_level_7, catalog_number, uom, pack_content,
                      created_at, updated_at)
-                    SELECT 
-                        demantra_item_skey, business_sector, business_unit, franchise, product_line, 
+                    SELECT
+                        demantra_item_skey, business_sector, business_unit, franchise, product_line,
                         ibp_level_5, ibp_level_6, ibp_level_7, catalog_number, uom, pack_content,
                         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                     FROM temp_product_hierarchy
                 """)
+                conn.commit()  # Commit the insertion
+            except Exception as e:
+                conn.rollback()  # Roll back on error
+                raise e
             finally:
                 # Unregister the temporary table
                 conn.unregister("temp_product_hierarchy")
@@ -455,20 +593,27 @@ def fetch_and_save_location_hierarchy(user_id: str = "system"):
         # Write to DuckDB location_hierarchy table
         if not df.is_empty():
             df_pandas = df.to_pandas()
-            
+
             # Insert the data into the DuckDB table (overwrite existing)
             conn.execute("DELETE FROM da.location_hierarchy")
+            conn.commit()  # Commit the deletion
             conn.register("df_pandas", df_pandas)  # Register the DataFrame as a temporary table
-            conn.execute("""
-                INSERT INTO da.location_hierarchy 
-                (location_skey, selling_division, area, stryker_group_region, region, country, 
-                 created_at, updated_at)
-                SELECT 
-                    location_skey, selling_division, area, stryker_group_region, region, country,
-                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                FROM df_pandas
-            """)
-            conn.unregister("df_pandas")  # Unregister the temporary table
+            try:
+                conn.execute("""
+                    INSERT INTO da.location_hierarchy
+                    (location_skey, selling_division, area, stryker_group_region, region, country,
+                     created_at, updated_at)
+                    SELECT
+                        location_skey, selling_division, area, stryker_group_region, region, country,
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    FROM df_pandas
+                """)
+                conn.commit()  # Commit the insertion
+            except Exception as e:
+                conn.rollback()  # Roll back on error
+                raise e
+            finally:
+                conn.unregister("df_pandas")  # Unregister the temporary table
         
         print(f"Successfully inserted {len(df)} records into da.location_hierarchy table")
         return df
