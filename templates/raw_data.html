@@ -128,9 +128,11 @@
             <div class="field-group">
                 <h4>Filters</h4>
                 <div class="filter-controls">
-                    <select id="filter-field" class="filter-select"><div></div></select>
-                  <div style="display:grid;grid-template-columns: 1fr 1fr;gap: 4px;">
-                  </div>
+                    <select id="filter-field" class="filter-select"></select>
+                    <div id="filter-value-container">
+                        <div style="display:grid;grid-template-columns: 1fr 1fr;gap: 4px;">
+                        </div>
+                    </div>
                 </div>
                 <div id="active-filters" class="active-filters"></div>
             </div>
@@ -461,6 +463,23 @@
             console.log("Default value field 'act_orders_rev' selected.");
         } else {
             console.log("Default value field 'act_orders_rev' not found.");
+            // If act_orders_rev is not found, try a few alternative names
+            const alternatives = ['Act Orders Rev', 'actual_orders', 'act_rev', 'actual_rev', 'sales'];
+            for (const altField of alternatives) {
+                const altOption = Array.from(valueFieldsSelect.options).find(opt => opt.value.toLowerCase().includes(altField));
+                if (altOption) {
+                    altOption.selected = true;
+                    console.log("Default value field '" + altOption.value + "' selected as alternative.");
+                    break;
+                }
+            }
+        }
+
+        // Also try to select forecast fields if available
+        const forecastOption = Array.from(valueFieldsSelect.options).find(opt => opt.value.toLowerCase().includes('forecast'));
+        if (forecastOption) {
+            forecastOption.selected = true;
+            console.log("Default forecast field '" + forecastOption.value + "' selected.");
         }
     }
 
@@ -568,6 +587,8 @@
                         maxItems: null, // Allow multiple selections
                         placeholder: 'Select fields...',
                         searchPlaceholder: 'Search fields...',
+                        maxOptions: 100, // Show more options in dropdown
+                        dropdownParent: 'body', // Render dropdown in body to avoid overflow issues
                         render:{
                             option: function(data, escape) {
                                 // Truncate long options for better display
@@ -904,7 +925,7 @@
 
         function updateFilterValueInput() {
             const filterField = document.getElementById('filter-field').value;
-            const filterValueContainer = document.querySelector('.filter-controls');
+            const filterValueContainer = document.getElementById('filter-value-container');
             let filterValueElement = document.getElementById('filter-value');
 
             if (filterValueElement) {
@@ -917,7 +938,7 @@
                 input.id = 'filter-value';
                 input.placeholder = 'Filter value';
                 input.className = 'filter-input';
-                filterValueContainer.insertBefore(input, filterValueContainer.children);
+                filterValueContainer.appendChild(input);
                 return;
             }
 
@@ -934,7 +955,7 @@
                 option.textContent = value;
                 selectElement.appendChild(option);
             });
-            filterValueContainer.insertBefore(selectElement, filterValueContainer.children);
+            filterValueContainer.appendChild(selectElement);
             // Initialize TomSelect for the newly created select element
             if (typeof TomSelect !== 'undefined') {
                 new TomSelect(selectElement, {

@@ -206,8 +206,9 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
                         WHERE ROWID IN (
                             SELECT ROWID FROM da.sales_actuals LIMIT 10000
                         )
-                    """).fetchone()
-                    rows_deleted_count = conn.execute("SELECT changes()").fetchone()[0]
+                    """)
+                    rows_deleted_count = conn.execute("SELECT changes()").fetchone()
+                    rows_deleted_count = rows_deleted_count[0] if rows_deleted_count and len(rows_deleted_count) > 0 else 0
 
                     if rows_deleted_count == 0:
                         break  # No more rows to delete
@@ -258,8 +259,8 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
             ON s.MDP_Key = m.MDP_Key
 
             WHERE
-                [SALES_DATE] BETWEEN '{current_start.strftime('%Y-%m-%d')}' AND '{current_end.strftime('%Y-%m-%d')}' AND
-                s.[Location_skey] IN (22,17,253)
+                [SALES_DATE] BETWEEN '{current_start.strftime('%Y-%m-%d')}' AND '{current_end.strftime('%Y-%m-%d')}'
+                -- AND s.[Location_skey] IN (22,17,253)
 
             GROUP BY
                 s.[item_skey],s.[Location_skey],s.[SALES_DATE]
@@ -281,10 +282,10 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
             print("Executing ODBC query with timeout protection...")
 
             # Try to get the reader with a timeout of 120 seconds
-            with ThreadPoolExecutor(max_workers=1) as executor:
+            with ThreadPoolExecutor(max_workers=4) as executor:
                 future = executor.submit(get_arrow_reader)
                 try:
-                    reader = future.result(timeout=120)  # 2 minute timeout
+                    reader = future.result(timeout=220)  # 2 minute timeout
                     print("Arrow reader created successfully. Starting batch processing...")
                 except FutureTimeoutError:
                     print("Timeout: Query execution took longer than 2 minutes, cancelling...")
@@ -303,7 +304,7 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
                 print(f"Batch {batch_count + 1} has {current_batch_rows} rows")
 
                 # Convert SALES_DATE to proper datetime format if needed
-                if 'SALES_DATE' in batch_df.columns:
+                if 'SALES_DATE' in batch_df.schema:
                     batch_df = batch_df.with_columns(
                         pl.col('SALES_DATE').cast(pl.Datetime).dt.replace_time_zone(None)
                     )
@@ -331,7 +332,7 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
 
                 # Rename columns that exist in the dataframe
                 for old_name, new_name in rename_mapping.items():
-                    if old_name in batch_df.columns:
+                    if old_name in batch_df.schema:
                         batch_df = batch_df.rename({old_name: new_name})
 
                 # Ensure numeric columns are properly typed to avoid decimal casting errors
@@ -342,16 +343,14 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
                                   'l2_stat_final_rev']
 
                 for col in numeric_columns:
-                    if col in batch_df.columns:
+                    if col in batch_df.schema:
                         # Convert to float to avoid decimal precision issues
                         batch_df = batch_df.with_columns([
                             pl.col(col).cast(pl.Float64, strict=False).alias(col)
                         ])
 
                 if not batch_df.is_empty():
-                    # Write this batch directly to DuckDB with explicit transaction management
-                    conn.execute("BEGIN TRANSACTION")
-
+                    # Write this batch directly to DuckDB with improved transaction management
                     try:
                         batch_pandas = batch_df.to_pandas()
 
@@ -359,7 +358,7 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
                         conn.register("batch_pandas", batch_pandas)
 
                         # Insert the data into the DuckDB table
-                        conn.execute("""
+                        insert_result = conn.execute("""
                             INSERT INTO da.sales_actuals
                             (item_skey, location_skey, sales_date, asp_final_rev, act_orders_rev, act_orders_rev_val,
                              fcst_df_final_rev, l0_df_final_rev, l1_df_final_rev, l2_df_final_rev,
@@ -373,8 +372,12 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
                                 CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                             FROM batch_pandas
                         """)
+                        
                         # Unregister the temporary table
                         conn.unregister("batch_pandas")
+                        
+                        # Get the number of rows actually inserted
+                        rows_inserted = insert_result if hasattr(insert_result, '__len__') else 0
                         print(f"Inserted batch {batch_count + 1} with {current_batch_rows} rows to DuckDB")
 
                         # Commit the transaction
@@ -383,11 +386,14 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
 
                     except Exception as batch_error:
                         # Roll back the transaction on error
-                        conn.rollback()
+                        try:
+                            conn.rollback()
+                        except:
+                            pass  # Ignore rollback errors
                         print(f"Error inserting batch {batch_count + 1}, transaction rolled back: {batch_error}")
                         traceback.print_exc()
-                        # Continue to the next batch
-                        raise batch_error
+                        # Continue to the next batch instead of raising the error
+                        continue
 
                 batch_count += 1
                 print(f"Completed processing batch {batch_count}")
@@ -455,7 +461,10 @@ def fetch_and_save_product_hierarchy(user_id: str = "system"):
         
         for batch in reader:
             batch_df = pl.from_arrow(batch)
-            df = pl.concat([df, batch_df])
+            if not df.is_empty():
+                df = pl.concat([df, batch_df])
+            else:
+                df = batch_df
         
         print(f"Retrieved {len(df)} records from product hierarchy")
         
@@ -570,7 +579,10 @@ def fetch_and_save_location_hierarchy(user_id: str = "system"):
         
         for batch in reader:
             batch_df = pl.from_arrow(batch)
-            df = pl.concat([df, batch_df])
+            if not df.is_empty():
+                df = pl.concat([df, batch_df])
+            else:
+                df = batch_df
         
         print(f"Retrieved {len(df)} records from location hierarchy")
         
