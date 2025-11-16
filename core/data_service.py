@@ -352,15 +352,16 @@ def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFram
         return pl.DataFrame()
 
 
-def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None) -> Tuple[Optional[pl.DataFrame], Dict[str, Any]]:
+def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_version: Optional[str] = None) -> Tuple[Optional[pl.DataFrame], Dict[str, Any]]:
     """Run the forecasting pipeline using MLForecast and save results to database
     
     Args:
         df: Polars DataFrame with sales data
         state: Optional DataState instance
+        forecast_version: Optional string to identify the forecast version
         
     Returns:
-        Tuple of (original_df, validation_results_dict)
+        Tuple of (combined_df, validation_results_dict)
     """
     if state is None:
         state = get_global_state()
@@ -379,6 +380,10 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None) -> Tuple[
             print(f"DEBUG: Forecast date range: {forecast_df['forecast_date'].min() if 'forecast_date' in forecast_df.columns else 'N/A'} to {forecast_df['forecast_date'].max() if 'forecast_date' in forecast_df.columns else 'N/A'}")
         
         if forecast_df is not None and not forecast_df.is_empty():
+            # Cast NHITS to Float32 to match other numeric columns
+            if 'NHITS' in forecast_df.columns:
+                forecast_df = forecast_df.with_columns(pl.col('NHITS').cast(pl.Float32))
+
             # Save forecasts to database if service is available
             db_service = get_database_service()
             saved_count = 0
@@ -428,7 +433,7 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None) -> Tuple[
                         print(f">>> DataFrame info: {forecast_df.shape} shape")
                         import time
                         db_start = time.time()
-                        saved_count = db_service.insert_forecasts(forecast_df, model_type="MLForecast")
+                        saved_count = db_service.insert_forecasts(forecast_df, model_type="MLForecast", forecast_version=forecast_version)
                         db_time = time.time() - db_start
                         print(f">>> Database insertion completed in {db_time:.2f}s")
                         print(f">>> Successfully saved {saved_count} forecast records to database")
@@ -436,10 +441,47 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None) -> Tuple[
                     print(f"Error saving forecasts to database: {save_error}")
                     import traceback
                     traceback.print_exc()
+
+            # Combine historical and forecast data for UI
+            # 1. Prepare historical data
+            hist_df = original_df.clone()
+            if 'NHITS' not in hist_df.columns:
+                hist_df = hist_df.with_columns(pl.lit(None, dtype=pl.Float32).alias('NHITS'))
+
+            # 2. Prepare forecast data
+            fcst_df = forecast_df.rename({'forecast_date': 'SALES_DATE'})
             
-            # Update state with original data (preserving original structure)
+            # Ensure original_df has unique_id for joining dimensions
+            if 'unique_id' not in original_df.columns:
+                original_df_with_id = prepare_data_for_mlforecast(original_df)
+            else:
+                original_df_with_id = original_df
+
+            dim_cols = [c for c in original_df_with_id.columns if c not in ['SALES_DATE', 'Act Orders Rev', 'ds', 'y', 'NHITS']]
+            if 'unique_id' not in dim_cols:
+                dim_cols.append('unique_id')
+            
+            dims_df = original_df_with_id[dim_cols].unique(subset=['unique_id'])
+            
+            fcst_with_dims = fcst_df.join(dims_df, on='unique_id', how='left')
+            
+            if 'Act Orders Rev' not in fcst_with_dims.columns:
+                fcst_with_dims = fcst_with_dims.with_columns(pl.lit(None, dtype=pl.Float32).alias('Act Orders Rev'))
+
+            # Align columns for concatenation
+            final_cols = hist_df.columns
+            
+            for col in final_cols:
+                if col not in fcst_with_dims.columns:
+                    fcst_with_dims = fcst_with_dims.with_columns(pl.lit(None).alias(col))
+            
+            fcst_with_dims = fcst_with_dims.select(final_cols)
+            
+            combined_df = pl.concat([hist_df, fcst_with_dims])
+
+            # Update state with combined data
             if state is not None:
-                state.df = original_df
+                state.df = combined_df
             
             # Return validation results
             validation_results = {
@@ -450,7 +492,7 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None) -> Tuple[
                 'forecasts_saved': saved_count
             }
             
-            return original_df, validation_results
+            return combined_df, validation_results
         else:
             print("No forecasts generated")
             return original_df, {'mae': 0.0, 'mape': 0.0, 'rmse': 0.0, 'forecasts_generated': 0, 'forecasts_saved': 0}
@@ -468,8 +510,12 @@ def create_models_action(df: pl.DataFrame, state: DataState = None) -> pl.DataFr
         state = get_global_state()
     
     try:
+        # Generate a unique forecast version using the current timestamp
+        forecast_version = datetime.now().strftime("F-%Y%m%d_%H%M%S")
+        print(f"Generated forecast version: {forecast_version}")
+
         # Run the MLForecast pipeline
-        result_df, validation_results = run_mlforecast_pipeline(df, state)
+        result_df, validation_results = run_mlforecast_pipeline(df, state, forecast_version=forecast_version)
         
         # Ensure original column structure is preserved for UI compatibility
         if result_df is not None and not result_df.is_empty():

@@ -42,6 +42,7 @@ async def dashboard(request: Request):
     # Get initial filter options from database service
     db_service = get_database_service()
     filter_options = db_service.get_filter_options(user_id="system")
+    forecast_versions = db_service.get_forecast_versions(user_id="system")
     
     # Create initial options similar to what filter_service provided
     initial_location_options = filter_options.get('regions', [])
@@ -51,6 +52,6 @@ async def dashboard(request: Request):
         "request": request,
         "initial_filter_state": FilterState(),
         "initial_location_options": initial_location_options,
-        "initial_product_options": initial_product_options
+        "initial_product_options": initial_product_options,
+        "forecast_versions": forecast_versions
     })
-

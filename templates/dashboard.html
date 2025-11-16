@@ -82,6 +82,24 @@
                 {% endfor %}
             </select>
         </div>
+        <div class="min-w-[160px] flex-1 max-w-[250px]">
+            <label class="block text-sm font-medium text-gray-700">Forecast Version</label>
+            <select
+                name="forecast_version"
+                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                hx-post="/api/update"
+                hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2'], [name='forecast_version']"
+                hx-target="#dashboard-content"
+                hx-trigger="change"
+                hx-indicator=".htmx-indicator"
+                hx-swap="innerHTML"
+            >
+                <option value="">Select version...</option>
+                {% for version in forecast_versions %}
+                <option value="{{ version }}">{{ version }}</option>
+                {% endfor %}
+            </select>
+        </div>
     </div>
     
     <!-- Action Buttons -->

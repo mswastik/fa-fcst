@@ -407,6 +407,7 @@
     }
 
     console.log(`Data received with ${data.length} rows.`);
+    console.log('First row of data:', JSON.stringify(data[0]));
 
     originalData = data;
     filteredData = [...originalData];
@@ -424,8 +425,14 @@
     renderCatalogNumberTable();
     console.log("Raw data and catalog table rendered.");
 
-    // Update multiselect to autocomplete after DOM updates
-    convertMultiSelectToAutocomplete();
+    // Update multiselect to TomSelect after DOM updates
+    initializeTomSelects();
+
+    // Also initialize field selectors which may have been updated
+    initializeFieldSelectors();
+
+    // Update TomSelect options with new fields after updating available fields
+    updateTomSelectOptions();
 
     // Apply default selections if none are made
     const rowFieldsSelect = document.getElementById('row-fields');
@@ -436,34 +443,31 @@
     let hasValueSelection = Array.from(valueFieldsSelect.selectedOptions).length > 0;
 
     if (!hasRowSelection) {
-        const defaultRowField = 'sales_date';
-        const rowOption = Array.from(rowFieldsSelect.options).find(opt => opt.value === defaultRowField);
+        const defaultRowField = 'sales_date';  // Changed from 'sales_date' to match actual field name
+        const rowOption = Array.from(rowFieldsSelect.options).find(opt => opt.value.toLowerCase() === defaultRowField.toLowerCase());
         if (rowOption) {
             rowOption.selected = true;
-            console.log("Default row field 'SALES_DATE' selected.");
+            console.log("Default row field 'sales_date' selected.");
         } else {
-            console.log("Default row field 'SALES_DATE' not found.");
+            console.log("Default row field 'sales_date' not found.");
         }
     }
 
     if (!hasValueSelection) {
-        const defaultValueField = 'act_orders_rev';
-        const valueOption = Array.from(valueFieldsSelect.options).find(opt => opt.value === defaultValueField);
+        const defaultValueField = 'act_orders_rev';  // Changed from 'act_orders_rev' to match actual field name
+        const valueOption = Array.from(valueFieldsSelect.options).find(opt => opt.value.toLowerCase() === defaultValueField.toLowerCase());
         if (valueOption) {
             valueOption.selected = true;
-            console.log("Default value field 'Act Orders Rev' selected.");
+            console.log("Default value field 'act_orders_rev' selected.");
         } else {
-            console.log("Default value field 'Act Orders Rev' not found.");
+            console.log("Default value field 'act_orders_rev' not found.");
         }
     }
 
     // Update custom displays
     [rowFieldsSelect, valueFieldsSelect].forEach(s => {
-        if (s && s._updateCustomDisplay) {
-            console.log(`Updating custom display for ${s.id}`);
-            s._updateCustomDisplay();
-        } else {
-            console.log(`_updateCustomDisplay not found for ${s.id}`);
+        if (s && s.tomselect) {
+            s.tomselect.sync();
         }
     });
     console.log("Custom displays updated.");
@@ -471,28 +475,6 @@
     // Generate the pivot data with the loaded data
     generatePivot();
 }
-
-    // Function to set default field selections
-    function setDefaultSelections() {
-        const rowFields = document.getElementById('row-fields');
-        const valueFields = document.getElementById('value-fields');
-
-        // Set default row field (SALES_DATE if available)
-        if (rowFields) {
-            const salesDateOption = Array.from(rowFields.options).find(opt => opt.value === 'SALES_DATE');
-            if (salesDateOption) {
-                salesDateOption.selected = true;
-            }
-        }
-
-        // Set default value field (Act Orders Rev if available)
-        if (valueFields) {
-            const revOption = Array.from(valueFields.options).find(opt => opt.value === 'Act Orders Rev');
-            if (revOption) {
-                revOption.selected = true;
-            }
-        }
-    }
 
     // Main function to generate pivot analysis
     function generatePivotAnalysis() {
@@ -553,77 +535,216 @@
 
         // Initialize TomSelect for dropdowns with search functionality
         if (typeof TomSelect !== 'undefined') {
-            // Initialize immediately and also set up mutation observer for dynamic content
             initializeTomSelects();
-
-            // Set up mutation observer to handle dynamically added content (like HTMX responses)
-            const observer = new MutationObserver(function(mutations) {
-                let shouldReinitialize = false;
-
-                mutations.forEach(function(mutation) {
-                    if (mutation.type === 'childList') {
-                        mutation.addedNodes.forEach(function(node) {
-                            if (node.nodeType === 1) { // Element node
-                                // Check if added node is a select with tom-select class or contains such elements
-                                if (node.classList && node.classList.contains('tom-select') && !node.classList.contains('ts-wrapper')) {
-                                    shouldReinitialize = true;
-                                } else if (node.querySelector && node.querySelector('.tom-select:not(.ts-wrapper)')) {
-                                    shouldReinitialize = true;
-                                }
-                            }
-                        });
-
-                        if (shouldReinitialize) {
-                            setTimeout(initializeTomSelects, 100); // Small delay to ensure DOM is updated
-                        }
-                    }
-                });
-            });
-
-            // Start observing the document for changes
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
+            initializeFieldSelectors(); // Initialize field selectors separately
         }
+
+        // Listen for HTMX events to reinitialize TomSelect on dynamically loaded content
+        document.addEventListener('htmx:afterOnLoad', function(evt) {
+            setTimeout(function() {
+                initializeTomSelects();
+                initializeFieldSelectors(); // Reinitialize field selectors as well
+            }, 0);
+        });
     });
 
-    // Function to initialize TomSelect for all matching elements
+    // Function to initialize TomSelect specifically for the field selection areas
+    function initializeFieldSelectors() {
+        // Initialize the field selector elements (these are the ones that were previously using convertMultiSelectToAutocomplete)
+        const fieldSelectorIds = ['row-fields', 'column-fields', 'value-fields'];
+        fieldSelectorIds.forEach(function(id) {
+            const selectElement = document.getElementById(id);
+            if (selectElement && selectElement.classList.contains('field-select')) {
+                if (typeof TomSelect !== 'undefined') {
+                    // Check if TomSelect is already initialized, and if so, destroy it first
+                    if (selectElement.tomselect) {
+                        selectElement.tomselect.destroy();
+                    }
+
+                    // Configuration for field selection areas with better UX
+                    const config = {
+                        create: false,
+                        allowEmptyOption: true,
+                        maxItems: null, // Allow multiple selections
+                        placeholder: 'Select fields...',
+                        searchPlaceholder: 'Search fields...',
+                        render:{
+                            option: function(data, escape) {
+                                // Truncate long options for better display
+                                let text = escape(data.text);
+                                if (text.length > 50) {
+                                    text = text.substring(0, 50) + '...';
+                                }
+                                return '<div>' + text + '</div>';
+                            },
+                            item: function(data, escape) {
+                                // Truncate long items for better display in selection
+                                let text = escape(data.text);
+                                if (text.length > 30) {
+                                    text = text.substring(0, 30) + '...';
+                                }
+                                return '<div title="' + escape(data.text) + '" class="field-selection-item">' + text + '</div>';
+                            }
+                        },
+                        onChange: function(value) {
+                            // Generate pivot when selection changes
+                            if (typeof generatePivot === 'function') {
+                                generatePivot();
+                            }
+                        },
+                        onInitialize: function() {
+                            // Additional initialization code if needed
+                        }
+                    };
+
+                    new TomSelect(selectElement, config);
+                }
+            }
+        });
+    }
+
+    // Function to initialize TomSelect for regular filter dropdowns (location and product filters)
     function initializeTomSelects() {
-        // Select all elements with tom-select class that haven't been initialized yet
-        const selectElements = document.querySelectorAll('.tom-select:not(.ts-wrapper)');
+        // Select all elements with tom-select class that haven't been initialized yet (excluding field selectors)
+        const selectElements = document.querySelectorAll('.tom-select:not(.ts-wrapper):not(#row-fields):not(#column-fields):not(#value-fields)');
         selectElements.forEach(function(selectElement) {
             // Skip if it's already been initialized
             if (selectElement.tomselect) return;
 
             // Add a check to ensure TomSelect is defined before initializing
             if (typeof TomSelect !== 'undefined') {
-                new TomSelect(selectElement, {
+                // Check if this is a multiple select
+                const isMultiple = selectElement.hasAttribute('multiple');
+
+                const config = {
                     create: false,
-                    maxItems: 1,
                     allowEmptyOption: true,
                     closeAfterSelect: true,
                     placeholder: 'Search or select...',
                     searchPlaceholder: 'Type to search...',
+                    render:{
+                        option: function(data, escape) {
+                            // Truncate long options for better display
+                            let text = escape(data.text);
+                            if (text.length > 50) {
+                                text = text.substring(0, 50) + '...';
+                            }
+                            return '<div>' + text + '</div>';
+                        },
+                        item: function(data, escape) {
+                            // Truncate long items for better display in selection
+                            let text = escape(data.text);
+                            if (text.length > 30) {
+                                text = text.substring(0, 30) + '...';
+                            }
+                            return '<div title="' + escape(data.text) + '">' + text + '</div>';
+                        }
+                    },
                     onInitialize: function() {
                         // Additional initialization code if needed
                     }
-                });
+                };
+
+                // Set maxItems based on whether it's multiple or not
+                if (isMultiple) {
+                    config.maxItems = null; // Allow unlimited selections for multiple selects
+                } else {
+                    config.maxItems = 1; // Single selection for regular dropdowns
+                }
+
+                new TomSelect(selectElement, config);
             }
         });
     }
 
-    // Set up an event listener for HTMX content loading to reinitialize TomSelect
-    document.addEventListener('DOMContentLoaded', function() {
-        if (typeof TomSelect !== 'undefined') {
-            initializeTomSelects();
-        }
+    // Function to update TomSelect elements with new options from data
+    function updateTomSelectOptions() {
+        if (currentData && currentData.length > 0) {
+            const fields = Object.keys(currentData[0]);
 
-        // Listen for HTMX events to reinitialize TomSelect on dynamically loaded content
-        document.addEventListener('htmx:afterOnLoad', function(evt) {
-            setTimeout(initializeTomSelects, 0);
-        });
-    });
+            // Update the field selectors (row-fields, column-fields, value-fields)
+            const fieldSelectorIds = ['row-fields', 'column-fields', 'value-fields'];
+            fieldSelectorIds.forEach(function(id) {
+                const selectElement = document.getElementById(id);
+
+                if (selectElement) {
+                    // Check if TomSelect is already initialized, and if so, destroy it first
+                    let currentSelections = [];
+                    if (selectElement.tomselect) {
+                        // Store current selections before recreating TomSelect
+                        let value = selectElement.tomselect.getValue();
+                        if (typeof value === 'string') {
+                            currentSelections = value.split(',').filter(Boolean);
+                        } else if (Array.isArray(value)) {
+                            currentSelections = value.filter(Boolean);
+                        }
+
+                        // Destroy existing TomSelect instance
+                        selectElement.tomselect.destroy();
+                    }
+
+                    // Clear all options
+                    selectElement.innerHTML = '';
+
+                    // Add new options from data
+                    fields.forEach(field => {
+                        const option = document.createElement('option');
+                        option.value = field;
+                        option.textContent = field;
+                        selectElement.appendChild(option);
+                    });
+
+                    // Initialize TomSelect with the new options
+                    if (typeof TomSelect !== 'undefined') {
+                        const config = {
+                            create: false,
+                            allowEmptyOption: true,
+                            maxItems: null, // Allow multiple selections
+                            placeholder: 'Select fields...',
+                            searchPlaceholder: 'Search fields...',
+                            render:{
+                                option: function(data, escape) {
+                                    // Truncate long options for better display
+                                    let text = escape(data.text);
+                                    if (text.length > 50) {
+                                        text = text.substring(0, 50) + '...';
+                                    }
+                                    return '<div>' + text + '</div>';
+                                },
+                                item: function(data, escape) {
+                                    // Truncate long items for better display in selection
+                                    let text = escape(data.text);
+                                    if (text.length > 30) {
+                                        text = text.substring(0, 30) + '...';
+                                    }
+                                    return '<div title="' + escape(data.text) + '" class="field-selection-item">' + text + '</div>';
+                                }
+                            },
+                            onChange: function(value) {
+                                // Generate pivot when selection changes
+                                if (typeof generatePivot === 'function') {
+                                    generatePivot();
+                                }
+                            },
+                            onInitialize: function() {
+                                // Restore previous selections if they exist
+                                if (currentSelections && currentSelections.length > 0) {
+                                    currentSelections.forEach(selection => {
+                                        if (fields.includes(selection)) {
+                                            selectElement.tomselect.addItem(selection);
+                                        }
+                                    });
+                                }
+                            }
+                        };
+
+                        new TomSelect(selectElement, config);
+                    }
+                }
+            });
+        }
+    }
+
 
     function toggleSidebar(sidebarId) {
         const sidebar = document.getElementById(sidebarId);
@@ -665,275 +786,7 @@
     }
 
 
-        function convertMultiSelectToAutocomplete() {
-            // Find all select elements with multiple attribute
-            const multiSelects = document.querySelectorAll('select[multiple]');
-
-            multiSelects.forEach(select => {
-                // Remove existing custom multiselect if it was already converted
-                const existingCustomContainer = select.nextElementSibling;
-                if (existingCustomContainer && existingCustomContainer.classList.contains('custom-multiselect')) {
-                    existingCustomContainer.remove();
-                }
-
-                // Get original options
-                const options = Array.from(select.options).map(opt => ({
-                    value: opt.value,
-                    text: opt.textContent,
-                    selected: opt.selected
-                }));
-
-                // Create custom multiselect container
-                const container = document.createElement('div');
-                container.className = 'custom-multiselect';
-                container.style.position = 'relative';
-                container.style.width = '100%';
-                container.style.display = 'block';
-
-                const multiselectContainer = document.createElement('div');
-                multiselectContainer.className = 'multiselect-container';
-                multiselectContainer.tabIndex = 0;
-                multiselectContainer.style.border = '1px solid #ccc';
-                multiselectContainer.style.borderRadius = '4px';
-                multiselectContainer.style.padding = '5px';
-                multiselectContainer.style.minHeight = '30px';
-                multiselectContainer.style.display = 'flex';
-                multiselectContainer.style.flexWrap = 'wrap';
-                multiselectContainer.style.alignItems = 'center';
-                multiselectContainer.style.gap = '4px';
-                multiselectContainer.style.backgroundColor = 'white';
-
-                const selectedItems = document.createElement('div');
-                selectedItems.className = 'selected-items';
-                selectedItems.style.display = 'flex';
-                selectedItems.style.flexWrap = 'wrap';
-                selectedItems.style.gap = '4px';
-                selectedItems.style.flexGrow = '1';
-
-                const searchInput = document.createElement('input');
-                searchInput.type = 'text';
-                searchInput.className = 'search-input';
-                searchInput.placeholder = 'Type to search...';
-                searchInput.style.border = 'none';
-                searchInput.style.outline = 'none';
-                searchInput.style.flexGrow = '1';
-                searchInput.style.minWidth = '50px';
-
-                const arrow = document.createElement('div');
-                arrow.className = 'dropdown-arrow';
-                arrow.style.cursor = 'pointer';
-
-                const dropdown = document.createElement('div');
-                dropdown.className = 'options-dropdown';
-                dropdown.style.position = 'absolute';
-                dropdown.style.top = '100%';
-                dropdown.style.left = '0';
-                dropdown.style.width = '100%';
-                dropdown.style.maxHeight = '200px';
-                dropdown.style.overflowY = 'auto';
-                dropdown.style.backgroundColor = 'white';
-                dropdown.style.border = '1px solid #ccc';
-                dropdown.style.borderRadius = '4px';
-                dropdown.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                dropdown.style.zIndex = '1000';
-                dropdown.style.display = 'none';
-
-                // Assemble structure
-                selectedItems.appendChild(searchInput);
-                multiselectContainer.appendChild(selectedItems);
-                multiselectContainer.appendChild(arrow);
-                container.appendChild(multiselectContainer);
-                container.appendChild(dropdown);
-
-                // Insert after original select and hide original
-                select.parentNode.insertBefore(container, select.nextSibling);
-                select.style.display = 'none';
-
-                let selectedValues = new Set();
-                let isOpen = false;
-
-                function updateSelectedDisplay() {
-                    // Update selectedValues from the actual select element
-                    selectedValues = new Set(Array.from(select.selectedOptions).map(opt => opt.value));
-
-                    // Clear current display except search input
-                    const tags = selectedItems.querySelectorAll('.selected-tag');
-                    tags.forEach(tag => tag.remove());
-
-                    // Add selected items as tags
-                    selectedValues.forEach(value => {
-                        const option = options.find(opt => opt.value === value);
-                        if (option) {
-                            const tag = document.createElement('div');
-                            tag.className = 'selected-tag';
-                            tag.innerHTML = `
-                                ${option.text}
-                                <span class="tag-remove" data-value="${option.value}">x</span>
-                            `;
-                            selectedItems.insertBefore(tag, searchInput);
-                        }
-                    });
-
-                    // Show placeholder if no selections
-                    if (selectedValues.size === 0) {
-                        searchInput.placeholder = 'Type to search...';
-                    } else {
-                        searchInput.placeholder = '';
-                    }
-
-                    // **CRITICAL FIX**: Trigger pivot generation after selection changes
-                    generatePivot();
-                }
-
-                function filterOptions(searchTerm = '') {
-                    dropdown.innerHTML = '';
-
-                    const filteredOptions = options.filter(opt =>
-                        opt.text.toLowerCase().includes(searchTerm.toLowerCase())
-                    );
-
-                    if (filteredOptions.length === 0) {
-                        const noOptions = document.createElement('div');
-                        noOptions.className = 'no-options';
-                        noOptions.textContent = 'No options found';
-                        dropdown.appendChild(noOptions);
-                        return;
-                    }
-
-                    filteredOptions.forEach(option => {
-                        const item = document.createElement('div');
-                        item.className = 'option-item';
-                        if (selectedValues.has(option.value)) {
-                            item.classList.add('selected');
-                        }
-
-                        item.innerHTML = `
-                            <input type="checkbox" class="option-checkbox" ${selectedValues.has(option.value) ? 'checked' : ''}>
-                            <span>${option.text}</span>
-                        `;
-
-                        item.addEventListener('click', (e) => {
-                            e.preventDefault();
-                            const checkbox = item.querySelector('.option-checkbox');
-
-                            if (selectedValues.has(option.value)) {
-                                selectedValues.delete(option.value);
-                                checkbox.checked = false;
-                                item.classList.remove('selected');
-                            } else {
-                                selectedValues.add(option.value);
-                                checkbox.checked = true;
-                                item.classList.add('selected');
-                            }
-
-                            // Update the original select element
-                            Array.from(select.options).forEach(opt => {
-                                opt.selected = selectedValues.has(opt.value);
-                            });
-
-                            updateSelectedDisplay();
-                            applyFilter(); // Apply filter on selection change
-                        });
-
-                        dropdown.appendChild(item);
-                    });
-                }
-
-                // Attach functions to the original select element for external access
-                select._updateCustomDisplay = updateSelectedDisplay;
-                select._filterOptions = filterOptions;
-
-                function openDropdown() {
-                    if (!isOpen) {
-                        isOpen = true;
-                        dropdown.style.display = 'block';
-                        arrow.classList.add('open');
-                        filterOptions(searchInput.value);
-                        searchInput.focus();
-                    }
-                }
-
-                function closeDropdown() {
-                    if (isOpen) {
-                        isOpen = false;
-                        dropdown.style.display = 'none';
-                        arrow.classList.remove('open');
-                        searchInput.value = '';
-                    }
-                }
-
-                // Event listeners
-                multiselectContainer.addEventListener('click', (e) => {
-                    if (e.target === multiselectContainer || e.target.classList.contains('selected-items')) {
-                        openDropdown();
-                    }
-                });
-
-                searchInput.addEventListener('input', (e) => {
-                    if (!isOpen && e.target.value.length > 0) {
-                        openDropdown();
-                    } else if (e.target.value.length === 0) {
-                        closeDropdown();
-                    }
-                    filterOptions(e.target.value);
-                });
-
-                searchInput.addEventListener('focus', () => {
-                    if (options.length > 0 || isOpen) {
-                        openDropdown();
-                    }
-                });
-                selectedItems.addEventListener('change',(e) => {
-                    console.log(e)
-                    applyFilter();
-                })
-                // Remove tag functionality
-                selectedItems.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('tag-remove')) {
-                        const value = e.target.dataset.value;
-                        selectedValues.delete(value);
-
-                        // **CRITICAL FIX**: Update the original select element
-                        Array.from(select.options).forEach(opt => {
-                            if (opt.value === value) {
-                                opt.selected = false;
-                            }
-                        });
-
-                        updateSelectedDisplay();
-                        applyFilter();
-
-                        // Update dropdown if open
-                        if (isOpen) {
-                            filterOptions(searchInput.value);
-                        }
-                    }
-                });
-
-                // Close dropdown when clicking outside
-                document.addEventListener('click', (e) => {
-                    if (!container.contains(e.target)) {
-                        closeDropdown();
-                    }
-                });
-
-                // Keyboard navigation
-                multiselectContainer.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        if (!isOpen) {
-                            openDropdown();
-                        }
-                    } else if (e.key === 'Escape') {
-                        closeDropdown();
-                    }
-                });
-
-                // Initial call for this specific select element
-                updateSelectedDisplay();
-                filterOptions();
-            });
-        }
+// Removed convertMultiSelectToAutocomplete function since we're using TomSelect exclusively
 
         let originalData = null;
         let currentData = null;  // Holds data after both activeFilters and catalog number selection
@@ -958,36 +811,87 @@
             const facetSelect = document.getElementById('facet-field');
 
             fieldSelects.forEach(selectElement => {
+                // Store the current selections before clearing the options
+                let currentSelections = [];
+                if (selectElement.selectedOptions) {
+                    currentSelections = Array.from(selectElement.selectedOptions).map(option => option.value);
+                } else {
+                    // For cases where selectedOptions might not be available
+                    currentSelections = [];
+                }
+
+                // Clear all options
                 selectElement.innerHTML = '';
+
                 fields.forEach(field => {
                     const option = document.createElement('option');
                     option.value = field;
                     option.textContent = field;
+                    // Re-select the option if it was previously selected
+                    if (currentSelections.includes(field)) {
+                        option.selected = true;
+                    }
                     selectElement.appendChild(option);
                 });
+
+                // If TomSelect is already initialized, update it
+                if (selectElement && selectElement.tomselect) {
+                    // Clear existing options in TomSelect
+                    selectElement.tomselect.clearOptions();
+                    // Add new options
+                    fields.forEach(field => {
+                        selectElement.tomselect.addOption({value: field, text: field});
+                    });
+                    // Re-select the options that were previously selected
+                    currentSelections.forEach(selectedValue => {
+                        if (fields.includes(selectedValue)) {
+                            selectElement.tomselect.addItem(selectedValue);
+                        }
+                    });
+                }
             });
 
             // Update facet field select
-            facetSelect.innerHTML = '<option value="">None</option>';
-            fields.forEach(field => {
-                const option = document.createElement('option');
-                option.value = field;
-                option.textContent = field;
-                facetSelect.appendChild(option);
-            });
-            facetSelect.onchange = function() {
-                facetField = this.value;
-                updateChart();
-            };
+            const currentFacetValue = facetSelect ? facetSelect.value : ""; // Store current selection
+            if (facetSelect) {
+                facetSelect.innerHTML = '<option value="">None</option>';
+                fields.forEach(field => {
+                    const option = document.createElement('option');
+                    option.value = field;
+                    option.textContent = field;
+                    if (field === currentFacetValue) {
+                        option.selected = true; // Keep the same selection if possible
+                    }
+                    facetSelect.appendChild(option);
+                });
+
+                // If TomSelect is already initialized for facetSelect, update it
+                if (facetSelect.tomselect) {
+                    facetSelect.tomselect.clearOptions();
+                    facetSelect.tomselect.addOption({value: "", text: "None"});
+                    fields.forEach(field => {
+                        facetSelect.tomselect.addOption({value: field, text: field});
+                    });
+                    // Restore the previous selection if it still exists
+                    if (currentFacetValue && fields.includes(currentFacetValue)) {
+                        facetSelect.tomselect.setValue(currentFacetValue);
+                    }
+                }
+
+                facetSelect.onchange = function() {
+                    facetField = this.value;
+                    updateChart();
+                };
+            }
 
             populateFilterFields();
-            convertMultiSelectToAutocomplete();
+            initializeTomSelects();
         }
 
         function populateFilterFields() {
             const filterFieldSelect = document.getElementById('filter-field');
             filterFieldSelect.innerHTML = '<option value="">Select Field</option>';
-            const allowedFields = ['StrykerGroupRegion', 'Area', 'Region', 'Country', 'Business Sector', 'Business Unit', 'Franchise', 'Product Line', 'IBP Level 5', 'IBP Level 6', 'IBP Level 7','CatalogNumber','birch','cluster', 'forecast_date', 'forecast_horizon', 'model_type', 'data_type'];
+            const allowedFields = ['stryker_group_region', 'area', 'region', 'country', 'business_sector', 'business_unit', 'franchise', 'product_line', 'ibp_level_5', 'ibp_level_6', 'ibp_level_7','catalog_number','birch','cluster', 'forecast_date', 'forecast_horizon', 'model_type', 'data_type'];
 
             allowedFields.forEach(field => {
                 const option = document.createElement('option');
@@ -1031,7 +935,16 @@
                 selectElement.appendChild(option);
             });
             filterValueContainer.insertBefore(selectElement, filterValueContainer.children);
-            convertMultiSelectToAutocomplete();
+            // Initialize TomSelect for the newly created select element
+            if (typeof TomSelect !== 'undefined') {
+                new TomSelect(selectElement, {
+                    create: false,
+                    allowEmptyOption: true,
+                    maxItems: null, // Allow multiple selections
+                    placeholder: 'Select values...',
+                    searchPlaceholder: 'Search values...'
+                });
+            }
         }
 
         function getUniqueValues(field) {
@@ -1053,7 +966,7 @@
                 element.remove();
             });
             renderActiveFilters();
-            convertMultiSelectToAutocomplete();
+            initializeTomSelects();
         }
 
         function applyFilter() {
@@ -1108,7 +1021,7 @@
 
         // Then apply catalog number selection to filteredData -> currentData
         if (selectedCatalogNumbers.length > 0) {
-            currentData = filteredData.filter(row => selectedCatalogNumbers.includes(row.CatalogNumber));
+            currentData = filteredData.filter(row => selectedCatalogNumbers.includes(row.catalog_number));
         } else {
             currentData = [...filteredData];
         }
@@ -1754,7 +1667,20 @@
 
                 const columnFields = getFieldsFromZone('columns');
                 const valueFields = getFieldsFromZone('values');
-                const labels = pivotData.rowKeys.map(label => {
+                // Sort labels chronologically if they're dates, otherwise keep original sorting
+                const rawLabels = pivotData.rowKeys;
+                const sortedLabels = [...rawLabels].sort((a, b) => {
+                    const dateA = new Date(a);
+                    const dateB = new Date(b);
+                    if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
+                        // If not dates, sort as strings
+                        return String(a).localeCompare(String(b));
+                    }
+                    // Sort dates chronologically
+                    return dateA - dateB;
+                });
+
+                const labels = sortedLabels.map(label => {
             const date = new Date(label);
             if (!isNaN(date.getTime())) {
                 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -1830,10 +1756,6 @@
                     `rgba(83, 102, 255, ${alpha})`
                 ];
 
-                //if (count === 1) {
-                //    return colors.slice(0, 10);
-                //}
-
                 return colors[index % colors.length];
             }
 
@@ -1863,7 +1785,7 @@
 
                 // Get unique catalog numbers from filtered data (after activeFilters)
                 const uniqueCatalogNumbers = Array.from(
-                    new Set(filteredData.map(row => row.CatalogNumber).filter(cn => cn !== undefined && cn !== null))
+                    new Set(filteredData.map(row => row.catalog_number).filter(cn => cn !== undefined && cn !== null))
                 ).sort();
 
                 if (uniqueCatalogNumbers.length === 0) {
@@ -1932,8 +1854,8 @@
                             option.selected = false; // Deselect all options
                         });
                         // Trigger update for custom multiselect displays
-                        if (selectElement && selectElement._updateCustomDisplay) {
-                            selectElement._updateCustomDisplay();
+                        if (selectElement && selectElement.tomselect) {
+                            selectElement.tomselect.sync();
                         }
                     }
                 });
@@ -2038,7 +1960,8 @@
                     return;
                 }
 
-                const fields = Object.keys(currentData);
+                // Get field names from the first row of the data (since currentData is an array of objects)
+                const fields = Object.keys(currentData[0]);
                 let csvContent = '';
 
                 // Header row
@@ -2067,100 +1990,6 @@
                 window.URL.revokeObjectURL(url);
             }
 
-            // Function to programmatically load data
-            function loadDataProgrammatically(data) {
-                if (!Array.isArray(data) || data.length === 0) {
-                    alert('Invalid data provided. Please provide an array of objects.');
-                    return;
-                }
-
-                // Show loading indicator
-                const loadingIndicator = document.createElement('div');
-                loadingIndicator.className = 'loading-indicator';
-                loadingIndicator.innerHTML = '<p>Loading data...</p><div class="progress-bar"><div class="progress"></div></div>';
-                document.body.appendChild(loadingIndicator);
-
-                // Process data in chunks to avoid UI freezing
-                originalData = data;
-
-                // Use setTimeout to allow UI to update before processing
-                setTimeout(() => {
-                    // Process in background
-                    filteredData = [...originalData];
-                    currentData = [...originalData];
-
-                    // Update UI
-                    updateAvailableFields();
-                    clearAll();
-                    clearFilters();
-
-                    // Remove loading indicator
-                    document.body.removeChild(loadingIndicator);
-
-                    // Update views
-                    updateRawDataView();
-                    renderCatalogNumberTable();
-
-                    // Set default selections
-                    const rowFieldsSelect = document.getElementById('row-fields');
-                    const columnFieldsSelect = document.getElementById('column-fields');
-                    const valueFieldsSelect = document.getElementById('value-fields');
-
-                    // Clear existing selections first
-                    Array.from(rowFieldsSelect.options).forEach(option => option.selected = false);
-                    const resetLink = document.getElementById('reset-catalog-filter');
-                    if (resetLink) {
-                        resetLink.addEventListener('click', function(e) {
-                            e.preventDefault(); // Prevent default link behavior
-                            resetCatalogNumberFilter();
-                        });
-                    }
-                    Array.from(columnFieldsSelect.options).forEach(option => option.selected = false);
-                    Array.from(valueFieldsSelect.options).forEach(option => option.selected = false);
-
-                    // Select default row field
-                    const defaultRowField = 'SALES_DATE';
-                    const rowOption = Array.from(rowFieldsSelect.options).find(opt => opt.value === defaultRowField);
-                    if (rowOption) {
-                        rowOption.selected = true;
-                    }
-
-                    // Select default value fields (include forecast values)
-                    // We now have separate forecast columns for each model type
-                    const defaultValueFields = ['Act Orders Rev'];
-                    // Add all forecast columns dynamically
-                    if (originalData && originalData.length > 0) {
-                        const firstRow = originalData;
-                        Object.keys(firstRow).forEach(key => {
-                            if (key.startsWith('forecast_')) {
-                                defaultValueFields.push(key);
-                            }
-                        });
-                    }
-                    // Fallback to some common forecast fields if no data is loaded yet
-                    if (defaultValueFields.length === 1) {
-                        defaultValueFields.push('forecast_NHITS', 'forecast_Ensemble', 'forecast_AutoARIMA');
-                    }
-                    defaultValueFields.forEach(field => {
-                        const valueOption = Array.from(valueFieldsSelect.options).find(opt => opt.value === field);
-                        if (valueOption) {
-                            valueOption.selected = true;
-                        }
-                    });
-
-                    // Trigger change events to update the custom autocomplete display
-                    [rowFieldsSelect, columnFieldsSelect, valueFieldsSelect].forEach(s => {
-                        if (s._updateCustomDisplay) {
-                            s._updateCustomDisplay();
-                        }
-                    });
-
-                    generatePivot(); // Generate pivot table with default values
-                }, 100);
-            }
-
-            // Expose the function globally for external calls (e.g., from parent window or other scripts)
-            window.loadPivotData = loadDataProgrammatically;
 
             // Forecast functionality
             function loadForecastData() {
@@ -2482,8 +2311,11 @@
 
             // Initialize the app
             document.addEventListener('DOMContentLoaded', function() {
-                // Ensure conversion happens after the DOM is ready and initial data might be loaded
-                convertMultiSelectToAutocomplete();
+                // Initialize TomSelect for all matching elements when DOM is loaded
+                if (typeof TomSelect !== 'undefined') {
+                    initializeTomSelects();
+                    initializeFieldSelectors();
+                }
 
                 // Trigger initial population of location2 and product2 based on initial values
                 setTimeout(function() {

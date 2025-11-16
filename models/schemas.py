@@ -11,6 +11,7 @@ class FilterState(BaseModel):
     location2: str = ""
     product1: str = "Franchise"
     product2: str = ""
+    forecast_version: Optional[str] = None
 
 
 class FilterRequest(BaseModel):

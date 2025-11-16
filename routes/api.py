@@ -167,7 +167,8 @@ async def update_dashboard(request: Request):
     location1=str(form_data.get('location1', 'Region')) if form_data.get('location1') else 'Region',
     location2=str(form_data.get('location2', '')) if form_data.get('location2') else '',
     product1=str(form_data.get('product1', 'Franchise')) if form_data.get('product1') else 'Franchise',
-    product2=str(form_data.get('product2', '')) if form_data.get('product2') else ''
+    product2=str(form_data.get('product2', '')) if form_data.get('product2') else '',
+    forecast_version=str(form_data.get('forecast_version', '')) if form_data.get('forecast_version') else ''
     )
     print(f"Filter state in /api/update: {filter_state}")
     # Check if we have complete filter conditions before loading data
@@ -178,82 +179,71 @@ async def update_dashboard(request: Request):
     
     print(f"Load data condition: {load_data_condition}")
     print(f"Filter state: {filter_state}")
-    
+    db_service = get_database_service()
     if load_data_condition:
-        # Use the db_service to get filtered data
-        try:
-            db_service = get_database_service()
-            filtered_df = db_service.get_filtered_sales_actuals(
-                location_col=filter_state.location1,
-                location_val=filter_state.location2,
-                product_col=filter_state.product1,
-                product_val=filter_state.product2,
-                user_id="system"
-            )
+        filtered_df = db_service.get_filtered_sales_actuals_with_forecasts(
+            location_col=filter_state.location1,
+            location_val=filter_state.location2,
+            product_col=filter_state.product1,
+            product_val=filter_state.product2,
+            forecast_version=filter_state.forecast_version,
+            user_id="system"
+        )            
+        # Apply standard data preparation for UI
+        from core.utils import DataUtils
+        if filtered_df is not None and not filtered_df.is_empty():
+            filtered_df = DataUtils.prepare_data_for_ui(filtered_df)
+        
+        # Prepare metadata similar to what filter_service provided
+        metadata = {
+            "total_records": len(filtered_df) if filtered_df is not None and not filtered_df.is_empty() else 0,
+            "filters_applied": {
+                "location": f"{filter_state.location1} = {filter_state.location2}" if filter_state.location1 and filter_state.location2 else None,
+                "product": f"{filter_state.product1} = {filter_state.product2}" if filter_state.product1 and filter_state.product2 else None
+            },
+            "columns": list(filtered_df.columns) if filtered_df is not None and not filtered_df.is_empty() else []
+        }
+        
+        print(f"Filtered DataFrame shape: {filtered_df.shape if filtered_df is not None else 'None'}")
+        print(f"Metadata: {metadata}")
+        
+        if filtered_df is not None and not filtered_df.is_empty():
+            # Update session with filtered data
+            # Update both df and filtered_df with the new filtered data
+            # Do not modify full_df which should remain as the original complete dataset
+            session.df = filtered_df.clone()
+            session.filtered_df = filtered_df.clone()
             
-            # Apply standard data preparation for UI
-            from core.utils import DataUtils
-            if filtered_df is not None and not filtered_df.is_empty():
-                filtered_df = DataUtils.prepare_data_for_ui(filtered_df)
+            # Prepare data for charts
+            chart_data = session.get_chart_data('line')
+            column_chart_data = session.get_chart_data('column')
             
-            # Prepare metadata similar to what filter_service provided
-            metadata = {
-                "total_records": len(filtered_df) if filtered_df is not None and not filtered_df.is_empty() else 0,
-                "filters_applied": {
-                    "location": f"{filter_state.location1} = {filter_state.location2}" if filter_state.location1 and filter_state.location2 else None,
-                    "product": f"{filter_state.product1} = {filter_state.product2}" if filter_state.product1 and filter_state.product2 else None
-                },
-                "columns": list(filtered_df.columns) if filtered_df is not None and not filtered_df.is_empty() else []
-            }
+            # Return HTML fragments for charts and table
+            chart_html = generate_chart_html(filtered_df, chart_data or {}, column_chart_data or {})
+            table_html = generate_table_html(filtered_df, filter_state)
             
-            print(f"Filtered DataFrame shape: {filtered_df.shape if filtered_df is not None else 'None'}")
-            print(f"Metadata: {metadata}")
+            # Return combined HTML for the dashboard content
+            combined_html = f"""
+            {chart_html}
             
-            if filtered_df is not None and not filtered_df.is_empty():
-                # Update session with filtered data
-                # Update both df and filtered_df with the new filtered data
-                # Do not modify full_df which should remain as the original complete dataset
-                session.df = filtered_df.clone()
-                session.filtered_df = filtered_df.clone()
-                
-                # Prepare data for charts
-                chart_data = session.get_chart_data('line')
-                column_chart_data = session.get_chart_data('column')
-                
-                # Return HTML fragments for charts and table
-                chart_html = generate_chart_html(filtered_df, chart_data or {}, column_chart_data or {})
-                table_html = generate_table_html(filtered_df, filter_state)
-                
-                # Return combined HTML for the dashboard content
-                combined_html = f"""
-                {chart_html}
-                
-                <!-- Details Table -->
-                <div class="w-full h-full p-0">
-                    <h3 class="p-2 text-lg font-bold">Select Product and Model data</h3>
-                    <div id="details-table">
-                        {table_html}
-                    </div>
+            <!-- Details Table -->
+            <div class="w-full h-full p-0">
+                <h3 class="p-2 text-lg font-bold">Select Product and Model data</h3>
+                <div id="details-table">
+                    {table_html}
                 </div>
-                """
-                
-                return HTMLResponse(content=combined_html)
-            else:
-                html = f"""
-                <div class="p-4 text-center text-gray-500">
-                    {metadata.get('error', 'No data found with current filters')}
-                </div>
-                """
-                return HTMLResponse(content=html)
-                
-        except Exception as e:
-            print(f"Error in update_dashboard: {e}")
+            </div>
+            """
+            
+            return HTMLResponse(content=combined_html)
+        else:
             html = f"""
-            <div class="p-4 text-center text-red-500">
-                Error loading filtered data: {str(e)}
+            <div class="p-4 text-center text-gray-500">
+                {metadata.get('error', 'No data found with current filters')}
             </div>
             """
             return HTMLResponse(content=html)
+
     else:
         # Return a complete dashboard structure without triggering elements to prevent loops
         html = """
@@ -307,6 +297,20 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
         values_json = [float(v) if v is not None else None for v in values]
         forecast_values_json = [float(v) if v is not None else None for v in forecast_values] if forecast_values else []
         
+        forecast_dataset_str = ""
+        if forecast_values_json:
+            forecast_dataset_str = f""",
+                {{
+                    label: 'Forecast',
+                    data: {json.dumps(forecast_values_json)},
+                    borderColor: 'var(--brand-gold)',
+                    backgroundColor: 'rgba(var(--brand-gold-rgb), 0.2)',
+                    borderDash: [5, 5],
+                    tension: 0.1,
+                    pointRadius: 3
+                }}
+            """
+
         line_chart_script = f"""
         <script>
             // Function to initialize or re-initialize the line chart
@@ -332,15 +336,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                                     tension: 0.1,
                                     pointRadius: 3
                                 }}
-                                {", {{" +
-                                  f"    label: 'Forecast',\n" +
-                                  f"    data: {json.dumps(forecast_values_json)},\n" +
-                                  f"    borderColor: 'var(--brand-gold)',\n" +
-                                  f"    backgroundColor: 'rgba(var(--brand-gold-rgb), 0.2)',\n" +
-                                  f"    borderDash: [5, 5],\n" +
-                                  f"    tension: 0.1,\n" +
-                                  f"    pointRadius: 3\n" +
-                                  f"  }}" if forecast_values_json else ""}
+                                {forecast_dataset_str}
                             ]
                         }},
                         options: {{
@@ -527,37 +523,70 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
         return '<div id="details-table"><p class="text-center p-4 text-gray-500">No data available</p></div>'
     
     try:
-        # Group data based on filter state
-        if filter_state.location1:
-            table_df = df.pivot(
-                'SALES_DATE',
-                index=filter_state.location1,
-                values='Act Orders Rev',
-                aggregate_function='sum',
-                sort_columns=True
-            )
+        # Determine the primary location column to use for indexing
+        index_col = None
+        if filter_state.location1 and filter_state.location1 in df.columns:
+            index_col = filter_state.location1
         else:
-            # Use the first available location column as fallback
+            # Fallback to the first available location column
             available_location_cols = ['Region', 'Country', 'Area']
-            index_col = None
             for col in available_location_cols:
                 if col in df.columns:
                     index_col = col
                     break
+        
+        # Define columns needed for pivot, including the index column if it exists
+        base_cols = ['SALES_DATE']
+        if index_col:
+            base_cols.append(index_col)
 
-            if index_col:
-                table_df = df.pivot(
-                    'SALES_DATE',
-                    index=index_col,
-                    values='Act Orders Rev',
-                    aggregate_function='sum',
-                    sort_columns=True
-                )
-            else:
-                # If no location columns available, create a simple aggregated table
-                table_df = df.group_by('SALES_DATE').agg(
-                    pl.col('Act Orders Rev').sum()
-                ).sort('SALES_DATE')
+        # 1. Separate Actuals and Forecasts
+        actuals_df = df.filter(pl.col('Act Orders Rev').is_not_null()).select(
+            base_cols + [pl.col('Act Orders Rev').alias('pivot_values')]
+        ).with_columns(
+            pl.lit('Actuals').alias('Metric'),
+            pl.col('pivot_values').cast(pl.Float64)
+        )
+
+        forecast_df = df.filter(pl.col('NHITS').is_not_null()).select(
+            base_cols + [pl.col('NHITS').alias('pivot_values')]
+        ).with_columns(
+            pl.lit('Forecast').alias('Metric'),
+            pl.col('pivot_values').cast(pl.Float64)
+        )
+        
+        # 2. Combine them
+        if not actuals_df.is_empty() and not forecast_df.is_empty():
+            df_for_pivot = pl.concat([actuals_df, forecast_df])
+        elif not actuals_df.is_empty():
+            df_for_pivot = actuals_df
+        elif not forecast_df.is_empty():
+            df_for_pivot = forecast_df
+        else:
+            df_for_pivot = pl.DataFrame()
+
+
+        if df_for_pivot.is_empty():
+             return '<div id="details-table"><p class="text-center p-4 text-gray-500">No data to display in table.</p></div>'
+
+        # 3. Pivot with a multi-level index if an index column is available
+        if index_col:
+            index_cols = [index_col, 'Metric']
+            table_df = df_for_pivot.pivot(
+                values='pivot_values',
+                index=index_cols,
+                on='SALES_DATE',
+                aggregate_function='sum'
+            ).sort(index_cols)
+        else:
+            # If no location index, pivot only on the Metric
+            table_df = df_for_pivot.pivot(
+                values='pivot_values',
+                index='Metric',
+                on='SALES_DATE',
+                aggregate_function='sum'
+            ).sort('Metric')
+
         
         # Generate HTML for the table with HTMX row click functionality
         html = '''
@@ -573,14 +602,14 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
         
         # Add rows
         html += '<tbody class="bg-white divide-y divide-gray-200">'
-        for row in table_df.iter_rows():
+        for row in table_df.iter_rows(named=True):
             # Create data attributes for row values to be used in HTMX
             row_data_attrs = ""
-            for i, col in enumerate(table_df.columns):
-                row_data_attrs += f'data-{col.lower().replace(" ", "-").replace("/", "-")}="{row[i]}" '
+            for col, value in row.items():
+                 row_data_attrs += f'data-{col.lower().replace(" ", "-").replace("/", "-")}="{value}" '
                 
             html += f'<tr class="hover:bg-gray-50 cursor-pointer" {row_data_attrs} hx-post="/api/update" hx-include="[name=\'location1\'], [name=\'location2\'], [name=\'product1\'], [name=\'product2\']" hx-target="#dashboard-content" hx-indicator=".htmx-indicator">'
-            for cell in row:
+            for cell in row.values():
                 cell_content = str(cell) if cell is not None else ""
                 # Truncate long content
                 if len(cell_content) > 50:
@@ -615,6 +644,8 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
         
         return html
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return f'<div id="details-table"><p class="text-center p-4 text-red-500">Error generating table: {str(e)}</p></div>'
 
 @router.post("/api/actions")
@@ -709,6 +740,11 @@ async def handle_action(request: Request):
                 user_id="system"
             )
             
+            # Apply standard data preparation for UI
+            from core.utils import DataUtils
+            if filtered_df is not None and not filtered_df.is_empty():
+                filtered_df = DataUtils.prepare_data_for_ui(filtered_df)
+            
             # Prepare metadata similar to what filter_service provided
             metadata = {
                 "total_records": len(filtered_df) if filtered_df is not None and not filtered_df.is_empty() else 0,
@@ -735,11 +771,26 @@ async def handle_action(request: Request):
                 """
                 return HTMLResponse(content=html)
             
-            # Run forecasting
-            result_df = core_data_service.create_models_action(filtered_df, session)
+            # Run forecasting model (this saves results to the database)
+            core_data_service.create_models_action(filtered_df, session)
+
+            # Now, fetch the combined actuals and forecast data
+            result_df = db_service.get_filtered_sales_actuals_with_forecasts(
+                location_col=filter_state.location1,
+                location_val=filter_state.location2,
+                product_col=filter_state.product1,
+                product_val=filter_state.product2,
+                user_id="system"
+            )
             
-            # Update session with forecasted data
+            # Apply standard data preparation for UI
+            from core.utils import DataUtils
+            if result_df is not None and not result_df.is_empty():
+                result_df = DataUtils.prepare_data_for_ui(result_df)
+
+            # Update session with the combined data
             session.df = result_df
+            session.filtered_df = result_df
             
             # Update dashboard content
             chart_data = session.get_chart_data('line') or {}

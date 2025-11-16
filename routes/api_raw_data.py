@@ -89,7 +89,8 @@ async def get_raw_data(request: Request):
         product2 = body.get('product2')
         db = get_database_service()
 
-        data = db.get_filtered_sales_actuals(
+        # Use the new combined method to get both sales actuals and forecasts
+        data = db.get_filtered_sales_actuals_with_forecasts(
             location_col=location1,
             location_val=location2,
             product_col=product1,
@@ -131,7 +132,8 @@ async def get_raw_data_pivot(request: Request):
 
     db = get_database_service()
 
-    data = db.get_filtered_sales_actuals(
+    # Use the new combined method to get both sales actuals and forecasts
+    data = db.get_filtered_sales_actuals_with_forecasts(
         location_col=location1,
         location_val=location2,
         product_col=product1,

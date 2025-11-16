@@ -75,7 +75,7 @@ class DatabaseService:
         """Execute a query for a specific user and return Polars DataFrame using Arrow format"""
         if not user_id:
             raise ValueError("user_id is required for multi-user operation")
-            
+
         column_mapping = {
             'Region': 'region',
             'Country': 'country',
@@ -90,10 +90,10 @@ class DatabaseService:
         import duckdb
         from time import sleep
         import random
-        
+
         max_retries = 3
         retry_delay = 0.05
-        
+
         conn = None
         for attempt in range(max_retries):
             try:
@@ -120,7 +120,7 @@ class DatabaseService:
                 df_result = conn.execute(query, params).fetchdf()
             else:
                 df_result = conn.execute(query).fetchdf()
-            
+
             # Convert to Polars DataFrame
             df = pl.from_pandas(df_result)
 
@@ -156,10 +156,10 @@ class DatabaseService:
         from contextlib import contextmanager
         from time import sleep
         import random
-        
+
         max_retries = 3
         retry_delay = 0.05
-        
+
         conn = None
         for attempt in range(max_retries):
             try:
@@ -185,7 +185,7 @@ class DatabaseService:
             cursor.execute(query, params)
         else:
             cursor.execute(query)
-        
+
         # We'll still return both cursor and connection for proper cleanup
         # But also provide a close method for the caller
         cursor._temp_conn = conn  # Attach connection to cursor for cleanup
@@ -197,7 +197,7 @@ class DatabaseService:
             cursor.close()
         except:
             pass  # Cursor might already be closed
-        
+
         # Close the associated temporary connection
         if hasattr(cursor, '_temp_conn') and cursor._temp_conn:
             try:
@@ -211,7 +211,7 @@ class DatabaseService:
             user_id = "system"
 
         query = """
-        SELECT 
+        SELECT
             sa.item_skey,
             sa.location_skey,
             sa.sales_date,
@@ -391,6 +391,120 @@ class DatabaseService:
 
         return self.execute_query(query, tuple(params) if params else None, user_id)
 
+    def get_filtered_sales_actuals_with_forecasts(self, location_col: Optional[str] = None, location_val: Optional[str] = None, product_col: Optional[str] = None, product_val: Optional[str] = None, forecast_version: Optional[str] = None, user_id: Optional[str] = None) -> pl.DataFrame:
+        """Get combined sales actuals and forecasts data for a specific user, showing both actuals and forecasts for same product and location"""
+        if not user_id:
+            user_id = "system"
+
+        # Map display names to database column names
+        column_mapping = {
+            'Region': 'region',
+            'Country': 'country',
+            'Area': 'area',
+            'Franchise': 'franchise',
+            'IBP Level 5': 'ibp_level_5',
+            'IBP Level 6': 'ibp_level_6',
+            'CatalogNumber': 'catalog_number'
+        }
+
+        where_conditions = []
+        params = []
+        if location_col and location_val:
+            db_location_col = column_mapping.get(location_col, location_col.lower().replace(' ', '_'))
+            where_conditions.append(f"lh.{db_location_col} = ?")
+            params.append(location_val)
+
+        if product_col and product_val:
+            db_product_col = column_mapping.get(product_col, product_col.lower().replace(' ', '_'))
+            where_conditions.append(f"ph.{db_product_col} = ?")
+            params.append(product_val)
+
+        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+
+        # This CTE identifies the skeys for the filtered products/locations
+        skeys_cte = f"""
+        WITH FilteredSkeys AS (
+            SELECT DISTINCT sa.item_skey, sa.location_skey
+            FROM da.sales_actuals sa
+            INNER JOIN da.product_hierarchy ph ON sa.item_skey = ph.demantra_item_skey
+            INNER JOIN da.location_hierarchy lh ON sa.location_skey = lh.location_skey
+            WHERE {where_clause}
+        )
+        """
+
+        # Query for Actuals
+        actuals_query = """
+        SELECT
+            sa.item_skey,
+            sa.location_skey,
+            sa.sales_date AS "SALES_DATE",
+            sa.act_orders_rev AS "Act Orders Rev",
+            NULL AS "NHITS",
+            lh.country AS "Country",
+            lh.region AS "Region",
+            lh.area AS "Area",
+            ph.catalog_number AS "CatalogNumber",
+            ph.franchise AS "Franchise",
+            ph.ibp_level_5 AS "IBP Level 5",
+            ph.ibp_level_6 AS "IBP Level 6"
+        FROM da.sales_actuals sa
+        INNER JOIN FilteredSkeys fs ON sa.item_skey = fs.item_skey AND sa.location_skey = fs.location_skey
+        INNER JOIN da.product_hierarchy ph ON sa.item_skey = ph.demantra_item_skey
+        INNER JOIN da.location_hierarchy lh ON sa.location_skey = lh.location_skey
+        """
+
+        # Query for Forecasts
+        forecasts_query = """
+        SELECT
+            f.item_skey,
+            f.location_skey,
+            f.forecast_date AS "SALES_DATE",
+            NULL AS "Act Orders Rev",
+            f.forecast_value AS "NHITS",
+            lh.country AS "Country",
+            lh.region AS "Region",
+            lh.area AS "Area",
+            ph.catalog_number AS "CatalogNumber",
+            ph.franchise AS "Franchise",
+            ph.ibp_level_5 AS "IBP Level 5",
+            ph.ibp_level_6 AS "IBP Level 6"
+        FROM da.forecasts f
+        INNER JOIN FilteredSkeys fs ON f.item_skey = fs.item_skey AND f.location_skey = fs.location_skey
+        INNER JOIN da.product_hierarchy ph ON f.item_skey = ph.demantra_item_skey
+        INNER JOIN da.location_hierarchy lh ON f.location_skey = lh.location_skey
+        """
+        
+        if forecast_version:
+            forecasts_query += f" WHERE f.model_version = '{forecast_version}'"
+
+
+        # Combine with UNION ALL
+        full_query = f"""
+        {skeys_cte}
+        {actuals_query}
+        UNION ALL
+        {forecasts_query}
+        ORDER BY "SALES_DATE"
+        """
+
+        return self.execute_query(full_query, tuple(params), user_id)
+
+    def get_forecast_versions(self, user_id: Optional[str] = None) -> List[str]:
+        """Get all distinct forecast versions from the forecasts table."""
+        if not user_id:
+            user_id = "system"
+        
+        query = "SELECT DISTINCT model_version FROM da.forecasts ORDER BY model_version"
+        
+        try:
+            result_df = self.execute_query(query, user_id=user_id)
+            if result_df is not None and not result_df.is_empty():
+                return result_df['model_version'].to_list()
+            return []
+        except Exception as e:
+            logger.error(f"Error getting forecast versions: {e}")
+            return []
+
     # Cache for filter options with a 5-minute TTL
     _filter_options_cache = {}
     _last_refresh_time = 0
@@ -399,40 +513,40 @@ class DatabaseService:
 
     def get_filter_options(self, user_id: str = None, force_refresh: bool = False) -> Dict[str, List[str]]:
         """Get available filter options from hierarchy tables with caching.
-        
+
         Optimized version using simpler queries to avoid expensive ARRAY_AGG operations.
-        
+
         Args:
             user_id: Optional user ID (defaults to 'system')
             force_refresh: If True, bypass cache and refresh data
-            
+
         Returns:
             Dictionary of filter options
         """
         current_time = time.time()
         cache_expired = (current_time - self._last_refresh_time) > self._cache_ttl
-        
+
         # Return cached data if available and not forcing refresh
         if not force_refresh and not cache_expired and self._filter_options_cache:
             logger.debug("Returning cached filter options")
             return self._filter_options_cache
-            
+
         with self._cache_lock:
             # Check again in case another thread already refreshed the cache
             if not force_refresh and not cache_expired and self._filter_options_cache:
                 logger.debug("Returning cached filter options (double-checked)")
                 return self._filter_options_cache
-                
+
             # Use default user_id if not provided
             user_id = user_id or "system"
             logger.info(f"Refreshing filter options for user {user_id}")
 
             try:
                 options = {}
-                
+
                 # Use simpler queries with LIMIT to avoid expensive ARRAY_AGG operations
                 # This is much faster for large datasets
-                
+
                 # Get product options with LIMIT to prevent memory issues
                 product_queries = [
                     ("SELECT DISTINCT franchise FROM da.product_hierarchy WHERE franchise IS NOT NULL ORDER BY franchise LIMIT 1000", 'franchises'),
@@ -440,25 +554,25 @@ class DatabaseService:
                     ("SELECT DISTINCT ibp_level_6 FROM da.product_hierarchy WHERE ibp_level_6 IS NOT NULL ORDER BY ibp_level_6 LIMIT 1000", 'ibp_level_6s'),
                     ("SELECT DISTINCT catalog_number FROM da.product_hierarchy WHERE catalog_number IS NOT NULL ORDER BY catalog_number LIMIT 1000", 'catalog_numbers')
                 ]
-                
+
                 # Get location options with LIMIT
                 location_queries = [
                     ("SELECT DISTINCT region FROM da.location_hierarchy WHERE region IS NOT NULL ORDER BY region LIMIT 1000", 'regions'),
                     ("SELECT DISTINCT country FROM da.location_hierarchy WHERE country IS NOT NULL ORDER BY country LIMIT 1000", 'countries'),
                     ("SELECT DISTINCT area FROM da.location_hierarchy WHERE area IS NOT NULL ORDER BY area LIMIT 1000", 'areas')
                 ]
-                
+
                 logger.debug("Executing optimized filter options queries with limits")
-                
+
                 # Execute queries in parallel with smaller batches
                 with ThreadPoolExecutor(max_workers=4) as executor:
                     futures = []
-                    
+
                     # Submit all queries
                     for query, key in product_queries + location_queries:
                         future = executor.submit(self.execute_query, query, None, user_id)
                         futures.append((future, key))
-                    
+
                     # Process results
                     for future, key in futures:
                         try:
@@ -475,30 +589,30 @@ class DatabaseService:
                         except Exception as e:
                             logger.error(f"Error processing {key}: {e}", exc_info=True)
                             options[key] = []
-                
+
                 # Ensure all expected keys exist with at least empty lists
                 for key in ['franchises', 'ibp_level_5s', 'ibp_level_6s', 'catalog_numbers',
                            'regions', 'countries', 'areas']:
                     if key not in options:
                         options[key] = []
-                
+
                 # Update cache
                 self._filter_options_cache = options
                 self._last_refresh_time = current_time
-                
+
                 total_options = sum(len(v) for v in options.values())
                 logger.info(f"Successfully refreshed filter options. Found {total_options} total options")
                 return options
-                
+
             except Exception as e:
                 error_msg = f"Error getting filter options: {str(e)}"
                 logger.error(error_msg, exc_info=True)
-                
+
                 # Return cached data if available, even if stale
                 if self._filter_options_cache:
                     logger.warning("Using cached filter options due to error")
                     return self._filter_options_cache
-                
+
                 # If no cached data, return empty options
                 logger.warning("No cached filter options available, returning empty options")
                 return {
@@ -558,7 +672,7 @@ class DatabaseService:
         """Get product options filtered by location type from database"""
         if not user_id:
             user_id = "system"
-        
+
         try:
             # Map display names to database column names
             column_mapping = {
@@ -570,11 +684,11 @@ class DatabaseService:
                 'IBP Level 6': 'ibp_level_6',
                 'CatalogNumber': 'catalog_number'
             }
-            
+
             # Get the corresponding database column names
             db_product_col = column_mapping.get(product_type, product_type.lower().replace(' ', '_'))
             db_location_col = column_mapping.get(location_type, location_type.lower().replace(' ', '_'))
-            
+
             # Query to get distinct products for the specified location type
             query = f"""
             SELECT DISTINCT ph.{db_product_col}
@@ -584,22 +698,22 @@ class DatabaseService:
             WHERE ph.{db_product_col} IS NOT NULL
             AND lh.{db_location_col} IS NOT NULL
             """
-            
+
             result_df = self.execute_query(query, user_id=user_id)
-            
+
             if result_df is not None and not result_df.is_empty():
                 # Extract values, filtering out nulls
                 values = [x for x in result_df[db_product_col].unique().to_list() if x is not None]
                 return values
             else:
                 return []
-                
+
         except Exception as e:
             print(f"Error getting cross-filtered options: {e}")
             # Fallback: return all possible values for the product type
             try:
                 filter_options = self.get_filter_options(user_id=user_id)
-                
+
                 prod_key = 'catalog_numbers'  # Default
                 if product_type == 'Franchise':
                     prod_key = 'franchises'
@@ -609,12 +723,12 @@ class DatabaseService:
                     prod_key = 'ibp_level_6s'
                 elif product_type == 'CatalogNumber':
                     prod_key = 'catalog_numbers'
-                
+
                 return filter_options.get(prod_key, [])
             except:
                 return []
 
-    def insert_forecasts(self, forecast_df: pl.DataFrame, model_type: str, user_id: str = None) -> int:
+    def insert_forecasts(self, forecast_df: pl.DataFrame, model_type: str, forecast_version: Optional[str] = None, user_id: str = None) -> int:
         """
         Inserts forecast data into the da.forecasts table.
         Assumes forecast_df has 'unique_id', 'forecast_date' (or 'ds' or 'SALES_DATE'), and forecast columns (e.g., 'Fcst Ensemble Rev').
@@ -625,8 +739,8 @@ class DatabaseService:
             user_id = "system" # Default to system user if not provided
 
         total_input_records = len(forecast_df)
-        logger.info(f"Starting forecast insertion for {total_input_records} records, user: {user_id}")
-        print(f"DEBUG: Starting forecast insertion for {total_input_records} records")
+        logger.info(f"Starting forecast insertion for {total_input_records} records, user: {user_id}, version: {forecast_version}")
+        print(f"DEBUG: Starting forecast insertion for {total_input_records} records, version: {forecast_version}")
         print(f"DEBUG: DataFrame schema: {forecast_df.schema}")
 
         if forecast_df.is_empty():
@@ -638,10 +752,10 @@ class DatabaseService:
         import duckdb
         from time import sleep
         import random
-        
+
         max_retries = 5
         retry_delay = 0.1
-        
+
         conn = None
         for attempt in range(max_retries):
             try:
@@ -662,7 +776,7 @@ class DatabaseService:
                 else:
                     print(f"Failed to create connection for forecast insertion: {e}")
                     raise
-        
+
         # Store connection reference for use in finally block
         self._temp_conn = conn
 
@@ -703,13 +817,13 @@ class DatabaseService:
         if use_direct_skeys:
             # Process all records at once when skeys are available directly
             logger.info("Processing records with direct skeys...")
-            
+
             # Get all required columns
             unique_ids = forecast_df['unique_id'].to_list() if 'unique_id' in forecast_df.columns else [None] * len(forecast_df)
             item_skeys = forecast_df['item_skey'].to_list()
             location_skeys = forecast_df['location_skey'].to_list()
             forecast_dates = forecast_df['forecast_date'].to_list()
-            
+
             # Handle different possible forecast value columns
             forecast_value_col = None
             possible_forecast_cols = ['Fcst Ensemble Rev', 'ensemble', 'NHITS', 'LSTM', 'AutoARIMA', 'AutoETS', 'SeasonalNaive']
@@ -717,17 +831,19 @@ class DatabaseService:
                 if col in forecast_df.columns:
                     forecast_value_col = col
                     break
-            
+
             if forecast_value_col:
                 forecast_values = forecast_df[forecast_value_col].to_list()
             else:
                 # Fallback if no forecast column is found
                 forecast_values = [0.0] * len(forecast_df)
-            
+
             # Get optional columns
             confidence_lower = forecast_df['confidence_lower'].to_list() if 'confidence_lower' in forecast_df.columns else [None] * len(forecast_df)
             confidence_upper = forecast_df['confidence_upper'].to_list() if 'confidence_upper' in forecast_df.columns else [None] * len(forecast_df)
-            model_versions = forecast_df['model_version'].to_list() if 'model_version' in forecast_df.columns else ['1.0'] * len(forecast_df)
+            
+            # Use the passed forecast_version, default to "1.0" if None
+            current_model_version = forecast_version if forecast_version is not None else "1.0"
 
             # Process all records in a vectorized way
             for i in range(len(forecast_df)):
@@ -735,7 +851,7 @@ class DatabaseService:
                     logger.warning(f"Skipping row {i} due to missing item_skey or location_skey: item_skey={item_skeys[i]}, location_skey={location_skeys[i]}")
                     skipped_count += 1
                     continue
-                
+
                 # Generate a unique forecast_id
                 forecast_id = uuid.uuid4().int & (1<<63)-1  # Generate a 63-bit integer UUID
 
@@ -757,28 +873,28 @@ class DatabaseService:
                     'forecast_value': forecast_values[i],
                     'confidence_lower': confidence_lower[i],
                     'confidence_upper': confidence_upper[i],
-                    'model_version': model_versions[i],
+                    'model_version': current_model_version,
                     'created_at': datetime.today().strftime('%Y-%m-%d %H:%M:%S')
                 })
         else:
             # Process records efficiently by extracting skeys from unique_id in bulk
             logger.info("Processing records by extracting skeys from unique_id in bulk...")
-            
+
             # Extract all unique_id values to process in bulk
             unique_ids = forecast_df['unique_id'].to_list()
-            
+
             # First, handle unique_ids in item_skey_location_skey format directly without database calls
             item_skeys = []
             location_skeys = []
-            
+
             # Calculate total unique IDs to process
             total_unique_ids = len(unique_ids)
             processed_unique_ids = 0
-            
+
             for unique_id in unique_ids:
                 item_skey = None
                 location_skey = None
-                
+
                 if unique_id and isinstance(unique_id, str):
                     # Check if unique_id is in item_skey_location_skey format
                     if '_' in unique_id:
@@ -795,7 +911,7 @@ class DatabaseService:
                         # For this format, extract country and catalog number
                         try:
                             country, catalog_number = unique_id.split(',', 1)
-                            # Since we can't do bulk lookups without a separate method, 
+                            # Since we can't do bulk lookups without a separate method,
                             # we'll still need to call _get_skeys_for_unique_id
                             item_skey, location_skey = self._get_skeys_for_unique_id(unique_id, user_id)
                         except ValueError:
@@ -805,35 +921,37 @@ class DatabaseService:
                     else:
                         # For other formats, try to get skeys via database
                         item_skey, location_skey = self._get_skeys_for_unique_id(unique_id, user_id)
-                
+
                 item_skeys.append(item_skey)
                 location_skeys.append(location_skey)
-                
+
                 processed_unique_ids += 1
                 if processed_unique_ids % 1000 == 0 or processed_unique_ids == total_unique_ids:
                     print(f"DEBUG: Processed {processed_unique_ids}/{total_unique_ids} unique IDs ({processed_unique_ids/total_unique_ids*100:.1f}%)")
-            
+
             # Now process all records in bulk with the extracted skeys
             forecast_values = []
             forecast_value_col = None
             possible_forecast_cols = ['Fcst Ensemble Rev', 'ensemble', 'NHITS', 'LSTM', 'AutoARIMA', 'AutoETS', 'SeasonalNaive']
-            
+
             for col in possible_forecast_cols:
                 if col in forecast_df.columns:
                     forecast_value_col = col
                     break
-            
+
             if forecast_value_col:
                 forecast_values = forecast_df[forecast_value_col].to_list()
             else:
                 # Fallback if no forecast column is found
                 forecast_values = [0.0] * len(forecast_df)
-            
+
             # Get optional columns
             confidence_lower = forecast_df['confidence_lower'].to_list() if 'confidence_lower' in forecast_df.columns else [None] * len(forecast_df)
             confidence_upper = forecast_df['confidence_upper'].to_list() if 'confidence_upper' in forecast_df.columns else [None] * len(forecast_df)
-            model_versions = forecast_df['model_version'].to_list() if 'model_version' in forecast_df.columns else ['1.0'] * len(forecast_df)
             
+            # Use the passed forecast_version, default to "1.0" if None
+            current_model_version = forecast_version if forecast_version is not None else "1.0"
+
             forecast_dates = forecast_df['forecast_date'].to_list()
             unique_ids_list = forecast_df['unique_id'].to_list()
 
@@ -866,10 +984,10 @@ class DatabaseService:
                     'forecast_value': forecast_values[i],
                     'confidence_lower': confidence_lower[i],
                     'confidence_upper': confidence_upper[i],
-                    'model_version': model_versions[i],
+                    'model_version': current_model_version,
                     'created_at': datetime.today().strftime('%Y-%m-%d %H:%M:%S')
                 })
-                
+
                 total_processed += 1
                 if total_processed % 1000 == 0:
                     print(f"DEBUG: Prepared {total_processed} records for insertion (skipped {skipped_count})")
@@ -886,34 +1004,34 @@ class DatabaseService:
         cursor = conn.cursor()
         # Set a timeout for the cursor operations
         logger.info("Database cursor created")
-        
+
         try:
             # Execute in larger batches to improve performance
             batch_size = 5000  # Increase batch size for better performance
             total_records = len(records_to_insert)
             inserted_count = 0
-            
+
             logger.info(f"Starting batch insertion of {total_records} records with batch size {batch_size}")
             print(f"DEBUG: Starting batch insertion of {total_records} records...")
-            
+
             import time
             start_time = time.time()
-            
+
             for i in range(0, total_records, batch_size):
                 batch_end = min(i + batch_size, total_records)
                 batch = records_to_insert[i:batch_end]
-                
+
                 if i % 5000 == 0:  # Log progress every 5000 records
                     elapsed = time.time() - start_time
                     records_so_far = i + len(batch)
                     print(f"DEBUG: Inserting records {records_so_far}/{total_records} (elapsed: {elapsed:.2f}s)")
-                
+
                 # Prepare the batch INSERT statement
                 columns = list(batch[0].keys())
                 columns_str = ", ".join(columns)
                 placeholders_str = ", ".join(["?" for _ in columns])
                 insert_query = f"INSERT INTO da.forecasts ({columns_str}) VALUES ({placeholders_str})"
-                
+
                 # Prepare batch values - convert each record to tuple in the correct order
                 batch_values = []
                 for record in batch:
@@ -935,11 +1053,11 @@ class DatabaseService:
                             else:
                                 values.append(value)
                     batch_values.append(tuple(values))
-                
+
                 # Execute batch insert with executemany for better performance
                 cursor.executemany(insert_query, batch_values)
                 inserted_count += len(batch_values)
-                    
+
             elapsed = time.time() - start_time
             logger.info(f"Successfully inserted {inserted_count} forecast records into da.forecasts. Skipped {skipped_count} records. Elapsed time: {elapsed:.2f}s")
             print(f"DEBUG: Successfully inserted {inserted_count} forecast records. Elapsed time: {elapsed:.2f}s")
