@@ -907,6 +907,7 @@
 
             populateFilterFields();
             initializeTomSelects();
+            renderCatalogNumberTable();
         }
 
         function populateFilterFields() {
@@ -988,6 +989,7 @@
             });
             renderActiveFilters();
             initializeTomSelects();
+            renderCatalogNumberTable();
         }
 
         function applyFilter() {
@@ -1042,7 +1044,7 @@
 
         // Then apply catalog number selection to filteredData -> currentData
         if (selectedCatalogNumbers.length > 0) {
-            currentData = filteredData.filter(row => selectedCatalogNumbers.includes(row.catalog_number));
+            currentData = filteredData.filter(row => selectedCatalogNumbers.includes(row.CatalogNumber));
         } else {
             currentData = [...filteredData];
         }
@@ -1803,10 +1805,10 @@
                     catalogNumberListDiv.innerHTML = '<p>No data loaded.</p>';
                     return;
                 }
-
+                console.log("filtered :", JSON.stringify(filterData[0]))
                 // Get unique catalog numbers from filtered data (after activeFilters)
                 const uniqueCatalogNumbers = Array.from(
-                    new Set(filteredData.map(row => row.catalog_number).filter(cn => cn !== undefined && cn !== null))
+                    new Set(filteredData.map(row => row.CatalogNumber).filter(cn => cn !== undefined && cn !== null))
                 ).sort();
 
                 if (uniqueCatalogNumbers.length === 0) {
@@ -2354,6 +2356,7 @@
                         product1Select.dispatchEvent(event);
                     }
                 }, 100); // Small delay to ensure DOM is fully loaded
+                
             });
         </script>
     </div>

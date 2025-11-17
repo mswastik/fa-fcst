@@ -550,9 +550,9 @@ class DatabaseService:
                 # Get product options with LIMIT to prevent memory issues
                 product_queries = [
                     ("SELECT DISTINCT franchise FROM da.product_hierarchy WHERE franchise IS NOT NULL ORDER BY franchise LIMIT 1000", 'franchises'),
-                    ("SELECT DISTINCT ibp_level_5 FROM da.product_hierarchy WHERE ibp_level_5 IS NOT NULL ORDER BY ibp_level_5 LIMIT 1000", 'ibp_level_5s'),
-                    ("SELECT DISTINCT ibp_level_6 FROM da.product_hierarchy WHERE ibp_level_6 IS NOT NULL ORDER BY ibp_level_6 LIMIT 1000", 'ibp_level_6s'),
-                    ("SELECT DISTINCT catalog_number FROM da.product_hierarchy WHERE catalog_number IS NOT NULL ORDER BY catalog_number LIMIT 1000", 'catalog_numbers')
+                    ("SELECT DISTINCT ibp_level_5 FROM da.product_hierarchy WHERE ibp_level_5 IS NOT NULL ORDER BY ibp_level_5 LIMIT 2000", 'ibp_level_5s'),
+                    ("SELECT DISTINCT ibp_level_6 FROM da.product_hierarchy WHERE ibp_level_6 IS NOT NULL ORDER BY ibp_level_6 LIMIT 2000", 'ibp_level_6s'),
+                    ("SELECT DISTINCT catalog_number FROM da.product_hierarchy WHERE catalog_number IS NOT NULL ORDER BY catalog_number LIMIT 22000", 'catalog_numbers')
                 ]
 
                 # Get location options with LIMIT
