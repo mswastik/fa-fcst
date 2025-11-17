@@ -219,7 +219,7 @@ async def update_dashboard(request: Request):
             column_chart_data = session.get_chart_data('column')
             
             # Return HTML fragments for charts and table
-            chart_html = generate_chart_html(filtered_df, chart_data or {}, column_chart_data or {})
+            chart_html = generate_chart_html(filtered_df, chart_data or {}, column_chart_data or {}, filter_state)
             table_html = generate_table_html(filtered_df, filter_state)
             
             # Return combined HTML for the dashboard content
@@ -286,12 +286,31 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
     line_chart_script = ""
     column_chart_script = ""
     
-    # Prepare line chart data - now showing selected product2 and location2 values
-    if filter_state and filter_state.location2 and filter_state.product2:
-        # Display current selected values instead of chart data
-        location_value = filter_state.location2
-        product_value = filter_state.product2
+    # Prepare line chart data
+    if line_chart_data and 'categories' in line_chart_data and 'values' in line_chart_data:
+        categories = line_chart_data['categories']
+        values = line_chart_data['values']
+        forecast_values = line_chart_data.get('forecast_values', [])
         
+        # Convert datetime objects to strings for JSON
+        categories_json = [str(c) for c in categories]
+        values_json = [float(v) if v is not None else None for v in values]
+        forecast_values_json = [float(v) if v is not None else None for v in forecast_values] if forecast_values else []
+        
+        forecast_dataset_str = ""
+        if forecast_values_json:
+            forecast_dataset_str = f""",
+                {{
+                    label: 'Forecast',
+                    data: {json.dumps(forecast_values_json)},
+                    borderColor: 'var(--brand-gold)',
+                    backgroundColor: 'rgba(var(--brand-gold-rgb), 0.2)',
+                    borderDash: [5, 5],
+                    tension: 0.1,
+                    pointRadius: 3
+                }}
+            """
+
         line_chart_script = f"""
         <script>
             // Function to initialize or re-initialize the line chart
@@ -303,28 +322,21 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                         lineCanvas.chart.destroy();
                     }}
                     
-                    // Create new chart instance showing selected values
+                    // Create new chart instance
                     lineCanvas.chart = new Chart(lineCanvas, {{
                         type: 'line',
                         data: {{
-                            labels: ['Selected Values'],
+                            labels: {json.dumps(categories_json)},
                             datasets: [
                                 {{
-                                    label: 'Location: {location_value}',
-                                    data: [100],
+                                    label: 'Actual',
+                                    data: {json.dumps(values_json)},
                                     borderColor: 'var(--brand-blue)',
                                     backgroundColor: 'rgba(var(--brand-blue-rgb), 0.2)',
                                     tension: 0.1,
-                                    pointRadius: 5
-                                }},
-                                {{
-                                    label: 'Product: {product_value}',
-                                    data: [100],
-                                    borderColor: 'var(--brand-gold)',
-                                    backgroundColor: 'rgba(var(--brand-gold-rgb), 0.2)',
-                                    tension: 0.1,
-                                    pointRadius: 5
+                                    pointRadius: 3
                                 }}
+                                {forecast_dataset_str}
                             ]
                         }},
                         options: {{
@@ -345,18 +357,26 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                             }},
                             scales: {{
                                 y: {{
-                                    beginAtZero: true,
-                                    max: 100,
-                                    title: {{
-                                        display: true,
-                                        text: 'Selection Status'
-                                    }}
+                                    beginAtZero: false
                                 }},
                                 x: {{
                                     display: true,
                                     title: {{
                                         display: true,
-                                        text: 'Current Selection'
+                                        text: 'Time'
+                                    }},
+                                    ticks: {{
+                                        callback: function(value, index, values) {{
+                                            // Convert datetime to abbreviated month-year format
+                                            if (this.getLabelForValue(value)) {{
+                                                const date = new Date(this.getLabelForValue(value));
+                                                if (!isNaN(date.getTime())) {{
+                                                    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                                    return monthNames[date.getMonth()] + ' ' + date.getFullYear();
+                                                }}
+                                            }}
+                                            return this.getLabelForValue(value);
+                                        }}
                                     }}
                                 }}
                             }}
@@ -482,7 +502,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
             // Re-initialize chart when HTMX finishes swapping content
             document.addEventListener('htmx:afterSettle', function(evt) {{
                 // Check if the event target contains our chart or is our chart
-                if (evt.target.contains(document.getElementById('column-chart-canvas')) || 
+                if (evt.target.contains(document.getElementById('column-chart-canvas')) ||
                     evt.target.id === 'column-chart-canvas' ||
                     evt.target.id === 'dashboard-content') {{
                     setTimeout(initColumnChart, 50); // Small delay to ensure DOM is updated
@@ -491,12 +511,21 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
         </script>
         """
     
+    # Generate dynamic filter text
+    filter_text = ""
+    if filter_state and filter_state.location2 and filter_state.product2:
+        filter_text = f"Showing: {filter_state.location2} - {filter_state.product2}"
+    elif filter_state:
+        filter_text = f"Filters: {filter_state.location2 or 'Not selected'} - {filter_state.product2 or 'Not selected'}"
+    else:
+        filter_text = "Chart data loaded"
+    
     return f"""
     <div id="charts-container" class="flex flex-col lg:flex-row gap-3 mb-3 w-full">
         <div id="column-chart" class="flex-1 border rounded p-4" style="min-height: 400px; min-width: 0;">
             <div class="flex justify-between items-center mb-2">
                 <h3 class="font-bold">Seasonality</h3>
-                <span class="text-sm text-gray-600">Chart data loaded</span>
+                <span class="font-bold text-sm text-gray-600">{filter_text}</span>
             </div>
             <div class="w-full" style="height: 350px;">
                 <canvas id="column-chart-canvas" class="w-full"></canvas>
@@ -506,7 +535,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
         <div id="line-chart" class="flex-1 border rounded p-4" style="min-height: 400px; min-width: 0;">
             <div class="flex justify-between items-center mb-2">
                 <h3 class="font-bold">Trend</h3>
-                <span class="text-sm text-gray-600">Chart data loaded</span>
+                <span class="font-bold text-sm text-gray-600">{filter_text}</span>
             </div>
             <div class="w-full" style="height: 350px;">
                 <canvas id="line-chart-canvas" class="w-full"></canvas>
@@ -693,7 +722,7 @@ async def handle_action(request: Request):
             chart_data = session.get_chart_data('line') or {}
             column_chart_data = session.get_chart_data('column') or {}
             
-            chart_html = generate_chart_html(result_df, chart_data, column_chart_data)
+            chart_html = generate_chart_html(result_df, chart_data, column_chart_data, filter_state)
             table_html = generate_table_html(result_df, filter_state)
             
             combined_html = f"""
@@ -795,7 +824,7 @@ async def handle_action(request: Request):
             chart_data = session.get_chart_data('line') or {}
             column_chart_data = session.get_chart_data('column') or {}
             
-            chart_html = generate_chart_html(result_df, chart_data, column_chart_data)
+            chart_html = generate_chart_html(result_df, chart_data, column_chart_data, filter_state)
             table_html = generate_table_html(result_df, filter_state)
             
             combined_html = f"""
@@ -888,11 +917,19 @@ async def get_charts(request: Request):
 
     session = state_service.get_or_create_session(session_id)
     
+    # Get filter state from session or request
+    filter_state = FilterState(
+        location1="Region",
+        location2="",
+        product1="Franchise",
+        product2=""
+    )
+    
     if session.filtered_df is not None:
         line_chart_data = session.get_chart_data('line') or {}
         column_chart_data = session.get_chart_data('column') or {}
         
-        chart_html = generate_chart_html(session.filtered_df, line_chart_data, column_chart_data)
+        chart_html = generate_chart_html(session.filtered_df, line_chart_data, column_chart_data, filter_state)
         return HTMLResponse(content=chart_html)
     else:
         return HTMLResponse(content='<div class="p-4">No data available for charts</div>')
