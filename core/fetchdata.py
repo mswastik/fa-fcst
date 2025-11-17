@@ -304,7 +304,7 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
                 print(f"Batch {batch_count + 1} has {current_batch_rows} rows")
 
                 # Convert SALES_DATE to proper datetime format if needed
-                if 'SALES_DATE' in batch_df.schema:
+                if 'SALES_DATE' in batch_df.columns:
                     batch_df = batch_df.with_columns(
                         pl.col('SALES_DATE').cast(pl.Datetime).dt.replace_time_zone(None)
                     )
@@ -332,7 +332,7 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
 
                 # Rename columns that exist in the dataframe
                 for old_name, new_name in rename_mapping.items():
-                    if old_name in batch_df.schema:
+                    if old_name in batch_df.columns:
                         batch_df = batch_df.rename({old_name: new_name})
 
                 # Ensure numeric columns are properly typed to avoid decimal casting errors
@@ -343,7 +343,7 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
                                   'l2_stat_final_rev']
 
                 for col in numeric_columns:
-                    if col in batch_df.schema:
+                    if col in batch_df.columns:
                         # Convert to float to avoid decimal precision issues
                         batch_df = batch_df.with_columns([
                             pl.col(col).cast(pl.Float64, strict=False).alias(col)

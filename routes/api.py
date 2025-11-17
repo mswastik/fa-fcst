@@ -280,37 +280,18 @@ async def update_dashboard(request: Request):
         """
         return HTMLResponse(content=html)
 
-def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], column_chart_data: Dict[str, Any]) -> str:
+def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], column_chart_data: Dict[str, Any], filter_state=None) -> str:
     """Generate HTML for charts with Chart.js implementation"""
     # Generate data for each chart type
     line_chart_script = ""
     column_chart_script = ""
     
-    # Prepare line chart data
-    if line_chart_data and 'categories' in line_chart_data and 'values' in line_chart_data:
-        categories = line_chart_data['categories']
-        values = line_chart_data['values']
-        forecast_values = line_chart_data.get('forecast_values', [])
+    # Prepare line chart data - now showing selected product2 and location2 values
+    if filter_state and filter_state.location2 and filter_state.product2:
+        # Display current selected values instead of chart data
+        location_value = filter_state.location2
+        product_value = filter_state.product2
         
-        # Convert datetime objects to strings for JSON
-        categories_json = [str(c) for c in categories]
-        values_json = [float(v) if v is not None else None for v in values]
-        forecast_values_json = [float(v) if v is not None else None for v in forecast_values] if forecast_values else []
-        
-        forecast_dataset_str = ""
-        if forecast_values_json:
-            forecast_dataset_str = f""",
-                {{
-                    label: 'Forecast',
-                    data: {json.dumps(forecast_values_json)},
-                    borderColor: 'var(--brand-gold)',
-                    backgroundColor: 'rgba(var(--brand-gold-rgb), 0.2)',
-                    borderDash: [5, 5],
-                    tension: 0.1,
-                    pointRadius: 3
-                }}
-            """
-
         line_chart_script = f"""
         <script>
             // Function to initialize or re-initialize the line chart
@@ -322,45 +303,60 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                         lineCanvas.chart.destroy();
                     }}
                     
-                    // Create new chart instance
+                    // Create new chart instance showing selected values
                     lineCanvas.chart = new Chart(lineCanvas, {{
                         type: 'line',
                         data: {{
-                            labels: {json.dumps(categories_json)},
+                            labels: ['Selected Values'],
                             datasets: [
                                 {{
-                                    label: 'Actual',
-                                    data: {json.dumps(values_json)},
+                                    label: 'Location: {location_value}',
+                                    data: [100],
                                     borderColor: 'var(--brand-blue)',
                                     backgroundColor: 'rgba(var(--brand-blue-rgb), 0.2)',
                                     tension: 0.1,
-                                    pointRadius: 3
+                                    pointRadius: 5
+                                }},
+                                {{
+                                    label: 'Product: {product_value}',
+                                    data: [100],
+                                    borderColor: 'var(--brand-gold)',
+                                    backgroundColor: 'rgba(var(--brand-gold-rgb), 0.2)',
+                                    tension: 0.1,
+                                    pointRadius: 5
                                 }}
-                                {forecast_dataset_str}
                             ]
                         }},
                         options: {{
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {{
-                                title: {{
-                                    display: true,
-                                    text: 'Trend Chart'
-                                }},
                                 legend: {{
                                     display: true,
-                                    position: 'top'
+                                    position: 'top',
+                                    labels: {{
+                                            boxWidth: 15,
+                                            boxHeight: 11,
+                                            font: {{
+                                                size: 11
+                                            }}
+                                }},
                                 }}
                             }},
                             scales: {{
                                 y: {{
-                                    beginAtZero: false
+                                    beginAtZero: true,
+                                    max: 100,
+                                    title: {{
+                                        display: true,
+                                        text: 'Selection Status'
+                                    }}
                                 }},
                                 x: {{
                                     display: true,
                                     title: {{
                                         display: true,
-                                        text: 'Time'
+                                        text: 'Current Selection'
                                     }}
                                 }}
                             }}
@@ -383,7 +379,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
             // Re-initialize chart when HTMX finishes swapping content
             document.addEventListener('htmx:afterSettle', function(evt) {{
                 // Check if the event target contains our chart or is our chart
-                if (evt.target.contains(document.getElementById('line-chart-canvas')) || 
+                if (evt.target.contains(document.getElementById('line-chart-canvas')) ||
                     evt.target.id === 'line-chart-canvas' ||
                     evt.target.id === 'dashboard-content') {{
                     setTimeout(initLineChart, 50); // Small delay to ensure DOM is updated
@@ -443,13 +439,16 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {{
-                                title: {{
-                                    display: true,
-                                    text: 'Seasonality Chart'
-                                }},
                                 legend: {{
                                     display: true,
-                                    position: 'top'
+                                    position: 'top',
+                                    labels: {{
+                                            boxWidth: 15,
+                                            boxHeight: 11,
+                                            font: {{
+                                                size: 11
+                                            }}
+                                }},
                                 }}
                             }},
                             scales: {{
@@ -493,7 +492,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
         """
     
     return f"""
-    <div id="charts-container" class="flex flex-col lg:flex-row gap-4 mb-6 w-full">
+    <div id="charts-container" class="flex flex-col lg:flex-row gap-3 mb-3 w-full">
         <div id="column-chart" class="flex-1 border rounded p-4" style="min-height: 400px; min-width: 0;">
             <div class="flex justify-between items-center mb-2">
                 <h3 class="font-bold">Seasonality</h3>
