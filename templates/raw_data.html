@@ -2,11 +2,11 @@
 {% block content %}
     <!-- Add filtering controls similar to homepage -->
     <div class="bg-white shadow-sm border-b">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div class="max-w-7xl mx-auto px-2 sm:px-2 lg:px-8 py-2">
             <div class="flex flex-wrap items-center gap-4">
                 <!-- Location 1 Filter -->
                 <div id="location1-container" class="min-w-[160px] flex-1">
-                    <label class="block text-sm font-medium text-gray-700 mb-1" id="location1-label">{{ initial_location_options[0] }}</label>
+                    <label class="block text-sm font-medium text-gray-700" id="location1-label">{{ initial_location_options[0] }}</label>
                     <select
                         name="location1"
                         class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
@@ -29,7 +29,7 @@
                     {% if location_options %}
                         {% include 'partials/raw_data_location_select2.html' %}
                     {% else %}
-                        <label class="block text-sm font-medium text-gray-700 mb-1" id="location2-label">{{ initial_location_options[0] }}</label>
+                        <label class="block text-sm font-medium text-gray-700" id="location2-label">{{ initial_location_options[0] }}</label>
                         <select
                             name="location2"
                             class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
@@ -51,7 +51,7 @@
 
                 <!-- Product 1 Filter -->
                 <div id="product1-container" class="min-w-[160px] flex-1">
-                    <label class="block text-sm font-medium text-gray-700 mb-1" id="product1-label">{{ initial_product_options[0] }}</label>
+                    <label class="block text-sm font-medium text-gray-700" id="product1-label">{{ initial_product_options[0] }}</label>
                     <select
                         name="product1"
                         class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
@@ -74,7 +74,7 @@
                     {% if product_options %}
                         {% include 'partials/raw_data_product_select2.html' %}
                     {% else %}
-                        <label class="block text-sm font-medium text-gray-700 mb-1" id="product2-label">{{ initial_product_options[0] }}</label>
+                        <label class="block text-sm font-medium text-gray-700" id="product2-label">{{ initial_product_options[0] }}</label>
                         <select
                             name="product2"
                             class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
