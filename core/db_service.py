@@ -391,120 +391,6 @@ class DatabaseService:
 
         return self.execute_query(query, tuple(params) if params else None, user_id)
 
-    def get_filtered_sales_actuals_with_forecasts(self, location_col: Optional[str] = None, location_val: Optional[str] = None, product_col: Optional[str] = None, product_val: Optional[str] = None, forecast_version: Optional[str] = None, user_id: Optional[str] = None) -> pl.DataFrame:
-        """Get combined sales actuals and forecasts data for a specific user, showing both actuals and forecasts for same product and location"""
-        if not user_id:
-            user_id = "system"
-
-        # Map display names to database column names
-        column_mapping = {
-            'Region': 'region',
-            'Country': 'country',
-            'Area': 'area',
-            'Franchise': 'franchise',
-            'IBP Level 5': 'ibp_level_5',
-            'IBP Level 6': 'ibp_level_6',
-            'CatalogNumber': 'catalog_number'
-        }
-
-        where_conditions = []
-        params = []
-        if location_col and location_val:
-            db_location_col = column_mapping.get(location_col, location_col.lower().replace(' ', '_'))
-            where_conditions.append(f"lh.{db_location_col} = ?")
-            params.append(location_val)
-
-        if product_col and product_val:
-            db_product_col = column_mapping.get(product_col, product_col.lower().replace(' ', '_'))
-            where_conditions.append(f"ph.{db_product_col} = ?")
-            params.append(product_val)
-
-        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
-
-        # This CTE identifies the skeys for the filtered products/locations
-        skeys_cte = f"""
-        WITH FilteredSkeys AS (
-            SELECT DISTINCT sa.item_skey, sa.location_skey
-            FROM da.sales_actuals sa
-            INNER JOIN da.product_hierarchy ph ON sa.item_skey = ph.demantra_item_skey
-            INNER JOIN da.location_hierarchy lh ON sa.location_skey = lh.location_skey
-            WHERE {where_clause}
-        )
-        """
-
-        # Query for Actuals
-        actuals_query = """
-        SELECT
-            sa.item_skey,
-            sa.location_skey,
-            sa.sales_date AS "SALES_DATE",
-            sa.act_orders_rev AS "Act Orders Rev",
-            NULL AS "NHITS",
-            lh.country AS "Country",
-            lh.region AS "Region",
-            lh.area AS "Area",
-            ph.catalog_number AS "CatalogNumber",
-            ph.franchise AS "Franchise",
-            ph.ibp_level_5 AS "IBP Level 5",
-            ph.ibp_level_6 AS "IBP Level 6"
-        FROM da.sales_actuals sa
-        INNER JOIN FilteredSkeys fs ON sa.item_skey = fs.item_skey AND sa.location_skey = fs.location_skey
-        INNER JOIN da.product_hierarchy ph ON sa.item_skey = ph.demantra_item_skey
-        INNER JOIN da.location_hierarchy lh ON sa.location_skey = lh.location_skey
-        """
-
-        # Query for Forecasts
-        forecasts_query = """
-        SELECT
-            f.item_skey,
-            f.location_skey,
-            f.forecast_date AS "SALES_DATE",
-            NULL AS "Act Orders Rev",
-            f.forecast_value AS "NHITS",
-            lh.country AS "Country",
-            lh.region AS "Region",
-            lh.area AS "Area",
-            ph.catalog_number AS "CatalogNumber",
-            ph.franchise AS "Franchise",
-            ph.ibp_level_5 AS "IBP Level 5",
-            ph.ibp_level_6 AS "IBP Level 6"
-        FROM da.forecasts f
-        INNER JOIN FilteredSkeys fs ON f.item_skey = fs.item_skey AND f.location_skey = fs.location_skey
-        INNER JOIN da.product_hierarchy ph ON f.item_skey = ph.demantra_item_skey
-        INNER JOIN da.location_hierarchy lh ON f.location_skey = lh.location_skey
-        """
-        
-        if forecast_version:
-            forecasts_query += f" WHERE f.model_version = '{forecast_version}'"
-
-
-        # Combine with UNION ALL
-        full_query = f"""
-        {skeys_cte}
-        {actuals_query}
-        UNION ALL
-        {forecasts_query}
-        ORDER BY "SALES_DATE"
-        """
-
-        return self.execute_query(full_query, tuple(params), user_id)
-
-    def get_forecast_versions(self, user_id: Optional[str] = None) -> List[str]:
-        """Get all distinct forecast versions from the forecasts table."""
-        if not user_id:
-            user_id = "system"
-        
-        query = "SELECT DISTINCT model_version FROM da.forecasts ORDER BY model_version"
-        
-        try:
-            result_df = self.execute_query(query, user_id=user_id)
-            if result_df is not None and not result_df.is_empty():
-                return result_df['model_version'].to_list()
-            return []
-        except Exception as e:
-            logger.error(f"Error getting forecast versions: {e}")
-            return []
-
     # Cache for filter options with a 5-minute TTL
     _filter_options_cache = {}
     _last_refresh_time = 0
@@ -838,12 +724,11 @@ class DatabaseService:
                 # Fallback if no forecast column is found
                 forecast_values = [0.0] * len(forecast_df)
 
-            # Get optional columns
-            confidence_lower = forecast_df['confidence_lower'].to_list() if 'confidence_lower' in forecast_df.columns else [None] * len(forecast_df)
-            confidence_upper = forecast_df['confidence_upper'].to_list() if 'confidence_upper' in forecast_df.columns else [None] * len(forecast_df)
-            
             # Use the passed forecast_version, default to "1.0" if None
             current_model_version = forecast_version if forecast_version is not None else "1.0"
+
+            # Create or get version_id for this forecast run
+            version_id = self._create_or_get_version_id(current_model_version, user_id=user_id)
 
             # Process all records in a vectorized way
             for i in range(len(forecast_df)):
@@ -855,26 +740,15 @@ class DatabaseService:
                 # Generate a unique forecast_id
                 forecast_id = uuid.uuid4().int & (1<<63)-1  # Generate a 63-bit integer UUID
 
-                # Calculate forecast horizon based on the difference between forecast date and current date
-                current_date = datetime.today().date()
-                forecast_date_obj = forecast_dates[i].date()
-                # Calculate the horizon in months
-                forecast_horizon = (forecast_date_obj.year - current_date.year) * 12 + (forecast_date_obj.month - current_date.month)
-                if forecast_date_obj.day < current_date.day:
-                    forecast_horizon -= 1  # Adjust if the day is earlier in the month
-
                 records_to_insert.append({
                     'forecast_id': forecast_id,
                     'item_skey': item_skeys[i],
                     'location_skey': location_skeys[i],
                     'forecast_date': forecast_dates[i].strftime('%Y-%m-%d'),  # Format date for SQL
-                    'forecast_horizon': max(1, forecast_horizon),  # Minimum horizon of 1, calculated based on date difference
                     'model_type': model_type,
                     'forecast_value': forecast_values[i],
-                    'confidence_lower': confidence_lower[i],
-                    'confidence_upper': confidence_upper[i],
                     'model_version': current_model_version,
-                    'created_at': datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+                    'version_id': version_id
                 })
         else:
             # Process records efficiently by extracting skeys from unique_id in bulk
@@ -945,12 +819,11 @@ class DatabaseService:
                 # Fallback if no forecast column is found
                 forecast_values = [0.0] * len(forecast_df)
 
-            # Get optional columns
-            confidence_lower = forecast_df['confidence_lower'].to_list() if 'confidence_lower' in forecast_df.columns else [None] * len(forecast_df)
-            confidence_upper = forecast_df['confidence_upper'].to_list() if 'confidence_upper' in forecast_df.columns else [None] * len(forecast_df)
-            
             # Use the passed forecast_version, default to "1.0" if None
             current_model_version = forecast_version if forecast_version is not None else "1.0"
+
+            # Create or get version_id for this forecast run
+            version_id = self._create_or_get_version_id(current_model_version, user_id=user_id)
 
             forecast_dates = forecast_df['forecast_date'].to_list()
             unique_ids_list = forecast_df['unique_id'].to_list()
@@ -966,26 +839,15 @@ class DatabaseService:
                 # Generate a unique forecast_id
                 forecast_id = uuid.uuid4().int & (1<<63)-1  # Generate a 63-bit integer UUID
 
-                # Calculate forecast horizon based on the difference between forecast date and current date
-                current_date = datetime.today().date()
-                forecast_date_obj = forecast_dates[i].date()
-                # Calculate the horizon in months
-                forecast_horizon = (forecast_date_obj.year - current_date.year) * 12 + (forecast_date_obj.month - current_date.month)
-                if forecast_date_obj.day < current_date.day:
-                    forecast_horizon -= 1  # Adjust if the day is earlier in the month
-
                 records_to_insert.append({
                     'forecast_id': forecast_id,
                     'item_skey': item_skey,
                     'location_skey': location_skey,
                     'forecast_date': forecast_dates[i].strftime('%Y-%m-%d'),  # Format date for SQL
-                    'forecast_horizon': max(1, forecast_horizon),  # Minimum horizon of 1, calculated based on date difference
                     'model_type': model_type,
                     'forecast_value': forecast_values[i],
-                    'confidence_lower': confidence_lower[i],
-                    'confidence_upper': confidence_upper[i],
                     'model_version': current_model_version,
-                    'created_at': datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+                    'version_id': version_id
                 })
 
                 total_processed += 1
@@ -1073,6 +935,170 @@ class DatabaseService:
                 conn.close()
 
         return inserted_count
+
+    def _create_or_get_version_id(self, version_name: str, user_id: str = "system", location_hierarchy: Optional[str] = None,
+                                  location_value: Optional[str] = None, product_hierarchy: Optional[str] = None,
+                                  product_value: Optional[str] = None):
+        """Create a new version record or get an existing one based on version name and other details."""
+        conn = duckdb.connect(self.connection_manager._db_path)
+        try:
+            # Check if a version with this name already exists
+            check_query = """
+            SELECT version_id FROM da.forecast_versions
+            WHERE version_name = ?
+            """
+            params = [version_name]
+
+            result = conn.execute(check_query, params).fetchone()
+
+            if result:
+                return result[0]  # Return existing version_id
+            else:
+                # Create a new version record
+                import uuid
+                from datetime import datetime
+                version_id = uuid.uuid4().int & (1<<63)-1  # Generate a 63-bit integer UUID
+
+                insert_query = """
+                INSERT INTO da.forecast_versions (version_id, version_name, created_at, location_hierarchy,
+                                                location_value, product_hierarchy, product_value, user_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """
+
+                params = [
+                    version_id,
+                    version_name,
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    location_hierarchy,
+                    location_value,
+                    product_hierarchy,
+                    product_value,
+                    user_id
+                ]
+
+                conn.execute(insert_query, params)
+                return version_id
+        except Exception as e:
+            logger.error(f"Error creating/finding version_id: {e}")
+            raise
+        finally:
+            conn.close()
+
+    def get_forecast_versions(self, user_id: Optional[str] = None) -> List[str]:
+        """Get all distinct forecast versions from the forecast_versions table."""
+        if not user_id:
+            user_id = "system"
+
+        query = "SELECT DISTINCT version_name FROM da.forecast_versions ORDER BY created_at DESC"
+
+        try:
+            result_df = self.execute_query(query, user_id=user_id)
+            if result_df is not None and not result_df.is_empty():
+                return result_df['version_name'].to_list()
+            return []
+        except Exception as e:
+            logger.error(f"Error getting forecast versions: {e}")
+            return []
+
+    def get_filtered_sales_actuals_with_forecasts(self, location_col: Optional[str] = None, location_val: Optional[str] = None,
+                                                product_col: Optional[str] = None, product_val: Optional[str] = None,
+                                                forecast_version: Optional[str] = None, user_id: Optional[str] = None) -> pl.DataFrame:
+        """Get combined sales actuals and forecasts data for a specific user, showing both actuals and forecasts for same product and location"""
+        if not user_id:
+            user_id = "system"
+
+        # Map display names to database column names
+        column_mapping = {
+            'Region': 'region',
+            'Country': 'country',
+            'Area': 'area',
+            'Franchise': 'franchise',
+            'IBP Level 5': 'ibp_level_5',
+            'IBP Level 6': 'ibp_level_6',
+            'CatalogNumber': 'catalog_number'
+        }
+
+        where_conditions = []
+        params = []
+        if location_col and location_val:
+            db_location_col = column_mapping.get(location_col, location_col.lower().replace(' ', '_'))
+            where_conditions.append(f"lh.{db_location_col} = ?")
+            params.append(location_val)
+
+        if product_col and product_val:
+            db_product_col = column_mapping.get(product_col, product_col.lower().replace(' ', '_'))
+            where_conditions.append(f"ph.{db_product_col} = ?")
+            params.append(product_val)
+
+        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+
+        # This CTE identifies the skeys for the filtered products/locations
+        skeys_cte = f"""
+        WITH FilteredSkeys AS (
+            SELECT DISTINCT sa.item_skey, sa.location_skey
+            FROM da.sales_actuals sa
+            INNER JOIN da.product_hierarchy ph ON sa.item_skey = ph.demantra_item_skey
+            INNER JOIN da.location_hierarchy lh ON sa.location_skey = lh.location_skey
+            WHERE {where_clause}
+        )
+        """
+
+        # Query for Actuals
+        actuals_query = """
+        SELECT
+            sa.item_skey,
+            sa.location_skey,
+            sa.sales_date AS "SALES_DATE",
+            sa.act_orders_rev AS "Act Orders Rev",
+            NULL AS "NHITS",
+            lh.country AS "Country",
+            lh.region AS "Region",
+            lh.area AS "Area",
+            ph.catalog_number AS "CatalogNumber",
+            ph.franchise AS "Franchise",
+            ph.ibp_level_5 AS "IBP Level 5",
+            ph.ibp_level_6 AS "IBP Level 6"
+        FROM da.sales_actuals sa
+        INNER JOIN FilteredSkeys fs ON sa.item_skey = fs.item_skey AND sa.location_skey = fs.location_skey
+        INNER JOIN da.product_hierarchy ph ON sa.item_skey = ph.demantra_item_skey
+        INNER JOIN da.location_hierarchy lh ON sa.location_skey = lh.location_skey
+        """
+
+        # Query for Forecasts
+        forecasts_query = """
+        SELECT
+            f.item_skey,
+            f.location_skey,
+            f.forecast_date AS "SALES_DATE",
+            NULL AS "Act Orders Rev",
+            f.forecast_value AS "NHITS",
+            lh.country AS "Country",
+            lh.region AS "Region",
+            lh.area AS "Area",
+            ph.catalog_number AS "CatalogNumber",
+            ph.franchise AS "Franchise",
+            ph.ibp_level_5 AS "IBP Level 5",
+            ph.ibp_level_6 AS "IBP Level 6"
+        FROM da.forecasts f
+        INNER JOIN da.forecast_versions fv ON f.version_id = fv.version_id
+        INNER JOIN FilteredSkeys fs ON f.item_skey = fs.item_skey AND f.location_skey = fs.location_skey
+        INNER JOIN da.product_hierarchy ph ON f.item_skey = ph.demantra_item_skey
+        INNER JOIN da.location_hierarchy lh ON f.location_skey = lh.location_skey
+        """
+
+        if forecast_version:
+            forecasts_query += f" WHERE fv.version_name = '{forecast_version}'"
+
+        # Combine with UNION ALL
+        full_query = f"""
+        {skeys_cte}
+        {actuals_query}
+        UNION ALL
+        {forecasts_query}
+        ORDER BY "SALES_DATE"
+        """
+
+        return self.execute_query(full_query, tuple(params), user_id)
 
     def close_user_session(self, user_id: str):
         """Close the database session for a specific user"""

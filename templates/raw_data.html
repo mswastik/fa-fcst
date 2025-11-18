@@ -913,7 +913,7 @@
         function populateFilterFields() {
             const filterFieldSelect = document.getElementById('filter-field');
             filterFieldSelect.innerHTML = '<option value="">Select Field</option>';
-            const allowedFields = ['stryker_group_region', 'area', 'region', 'country', 'business_sector', 'business_unit', 'franchise', 'product_line', 'ibp_level_5', 'ibp_level_6', 'ibp_level_7','catalog_number','birch','cluster', 'forecast_date', 'forecast_horizon', 'model_type', 'data_type'];
+            const allowedFields = ['stryker_group_region', 'area', 'region', 'country', 'business_sector', 'business_unit', 'franchise', 'product_line', 'ibp_level_5', 'ibp_level_6', 'ibp_level_7','catalog_number','birch','cluster', 'forecast_date', 'model_type', 'data_type'];
 
             allowedFields.forEach(field => {
                 const option = document.createElement('option');
@@ -2356,7 +2356,7 @@
                         product1Select.dispatchEvent(event);
                     }
                 }, 100); // Small delay to ensure DOM is fully loaded
-                
+
             });
         </script>
     </div>
