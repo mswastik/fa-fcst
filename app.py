@@ -58,6 +58,7 @@ async def raw_data_page(request: Request):
     from core.db_service import get_database_service
     db_service = get_database_service()
     filter_options = db_service.get_filter_options(user_id="system")
+    forecast_versions = db_service.get_forecast_versions(user_id="system")
 
     initial_location_options = ["Region", "Country", "Area"]
     initial_product_options = ["Franchise", "IBP Level 5", "IBP Level 6", "CatalogNumber"]
@@ -68,7 +69,8 @@ async def raw_data_page(request: Request):
         "initial_product_options": initial_product_options,
         "location_options": filter_options.get('regions', []),
         "product_options": filter_options.get('franchises', []),
-        "all_filter_options": filter_options  # Add all filter options for complete functionality
+        "all_filter_options": filter_options,  # Add all filter options for complete functionality
+        "forecast_versions": forecast_versions,
     }
     return templates.TemplateResponse("raw_data.html", context)
 

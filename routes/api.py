@@ -695,7 +695,8 @@ async def handle_action(request: Request):
         location1=str(form_data.get('location1', 'Region')) if form_data.get('location1') else 'Region',
         location2=str(form_data.get('location2', '')) if form_data.get('location2') else '',
         product1=str(form_data.get('product1', 'Franchise')) if form_data.get('product1') else 'Franchise',
-        product2=str(form_data.get('product2', '')) if form_data.get('product2') else ''
+        product2=str(form_data.get('product2', '')) if form_data.get('product2') else '',
+        forecast_version=str(form_data.get('forecast_version', '')) if form_data.get('forecast_version') else ''
     )
     
     try:
@@ -800,7 +801,7 @@ async def handle_action(request: Request):
                 return HTMLResponse(content=html)
             
             # Run forecasting model (this saves results to the database)
-            core_data_service.create_models_action(filtered_df, session)
+            core_data_service.create_models_action(filtered_df, session, forecast_version=filter_state.forecast_version)
 
             # Now, fetch the combined actuals and forecast data
             result_df = db_service.get_filtered_sales_actuals_with_forecasts(
@@ -906,6 +907,26 @@ async def handle_action(request: Request):
         </div>
         """
         return HTMLResponse(content=html)
+
+@router.get("/api/versions", response_class=JSONResponse)
+async def get_versions():
+    """Get all available forecast versions."""
+    try:
+        db_service = get_database_service()
+        versions = db_service.get_forecast_versions(user_id="system")
+        return {"versions": versions}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/versions/create", response_class=JSONResponse)
+async def create_version(request: Request, version_name: str = Form(...)):
+    """Create a new forecast version."""
+    try:
+        db_service = get_database_service()
+        version_id = db_service._create_or_get_version_id(version_name, user_id="system")
+        return {"version_name": version_name, "version_id": version_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/api/charts")
 async def get_charts(request: Request):

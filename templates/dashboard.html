@@ -117,12 +117,9 @@
         </button>
         <button 
             class="btn px-4 py-2 rounded"
-            hx-post="/api/actions"
-            hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
-            hx-vals="js:{action: 'forecast'}"
-            hx-target="#dashboard-content"
-            hx-swap="innerHTML"
-            hx-indicator=".htmx-indicator"
+            hx-get="/modal/forecast-version"
+            hx-target="body"
+            hx-swap="beforeend"
         >
             Generate Forecast
         </button>
@@ -184,6 +181,21 @@
 </div>
 
 <script>
+    document.body.addEventListener('generateForecast', function(evt) {
+        htmx.ajax('POST', '/api/actions', {
+            target: '#dashboard-content',
+            swap: 'innerHTML',
+            values: {
+                action: 'forecast',
+                location1: document.querySelector('[name=location1]').value,
+                location2: document.querySelector('[name=location2]').value,
+                product1: document.querySelector('[name=product1]').value,
+                product2: document.querySelector('[name=product2]').value,
+                forecast_version: evt.detail.version
+            }
+        });
+    });
+
     // Initialize TomSelect for searchable dropdowns
     function initSearchableSelects() {
         const selects = document.querySelectorAll('select.tom-select');

@@ -504,14 +504,15 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_
         return df, {'error': str(e), 'forecasts_generated': 0, 'forecasts_saved': 0}
 
 
-def create_models_action(df: pl.DataFrame, state: DataState = None) -> pl.DataFrame:
+def create_models_action(df: pl.DataFrame, state: DataState = None, forecast_version: Optional[str] = None) -> pl.DataFrame:
     """Business logic for creating forecasting models using MLForecast"""
     if state is None:
         state = get_global_state()
     
     try:
         # Generate a unique forecast version using the current timestamp
-        forecast_version = datetime.now().strftime("F-%Y%m%d_%H%M%S")
+        if forecast_version is None:
+            forecast_version = datetime.now().strftime("F-%Y%m%d_%H%M%S")
         print(f"Generated forecast version: {forecast_version}")
 
         # Run the MLForecast pipeline

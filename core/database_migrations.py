@@ -34,6 +34,21 @@ def migrate_forecast_schema(db_path: str = "fcst.duckdb"):
     conn.execute(create_forecast_versions_table_sql)
     logger.info("Created forecast_versions table")
 
+    # Create the new causal_factors table
+    create_causal_factors_table_sql = """
+    CREATE TABLE IF NOT EXISTS da.causal_factors (
+        location_skey BIGINT,
+        item_skey BIGINT,
+        forecast_date DATE,
+        version_id BIGINT,
+        causal_factor_1 DOUBLE,
+        causal_factor_2 DOUBLE,
+        PRIMARY KEY (location_skey, item_skey, forecast_date, version_id)
+    );
+    """
+    conn.execute(create_causal_factors_table_sql)
+    logger.info("Created causal_factors table")
+
     # Add the new version_id column to forecasts table first
     try:
         conn.execute("ALTER TABLE da.forecasts ADD COLUMN version_id BIGINT;")
@@ -110,6 +125,9 @@ def migrate_forecast_schema(db_path: str = "fcst.duckdb"):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_forecasts_date ON da.forecasts(forecast_date);")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_forecast_versions_created_at ON da.forecast_versions(created_at);")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_forecasts_override ON da.forecasts(override_value);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_causal_factors_version_id ON da.causal_factors(version_id);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_causal_factors_item_location ON da.causal_factors(item_skey, location_skey);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_causal_factors_date ON da.causal_factors(forecast_date);")
 
     logger.info("Created indexes for improved performance")
 

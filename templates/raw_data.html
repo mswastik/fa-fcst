@@ -6,7 +6,7 @@
             <div class="flex flex-wrap items-center gap-4">
                 <!-- Location 1 Filter -->
                 <div id="location1-container" class="min-w-[160px] flex-1">
-                    <label class="block text-sm font-medium text-gray-700" id="location1-label">{{ initial_location_options[0] }}</label>
+                    <label class="block text-sm font-medium text-gray-700" id="location1-label">Location</label>
                     <select
                         name="location1"
                         class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
@@ -51,7 +51,7 @@
 
                 <!-- Product 1 Filter -->
                 <div id="product1-container" class="min-w-[160px] flex-1">
-                    <label class="block text-sm font-medium text-gray-700" id="product1-label">{{ initial_product_options[0] }}</label>
+                    <label class="block text-sm font-medium text-gray-700" id="product1-label">Product</label>
                     <select
                         name="product1"
                         class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
@@ -92,6 +92,26 @@
                             {% endfor %}
                         </select>
                     {% endif %}
+                </div>
+                                <!-- Forecast Version Filter -->
+                <div id="forecast-version-container" class="min-w-[160px] flex-1">
+                    <label class="block text-sm font-medium text-gray-700" id="forecast-version-label">Forecast Version</label>
+                    <select
+                        name="forecast_version"
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                        hx-post="/api/raw_data/pivot"
+                        hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2'], [name='forecast_version']"
+                        hx-indicator=".htmx-indicator"
+                        hx-trigger="change"
+                        hx-target="body"
+                        hx-swap="none"
+                        hx-on:htmx:after-request="initializePivotInterface(event.detail.xhr.response)"
+                    >
+                        <option value="">Select version...</option>
+                        {% for version in forecast_versions %}
+                        <option value="{{ version }}">{{ version }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
         </div>
@@ -445,38 +465,28 @@
     let hasValueSelection = Array.from(valueFieldsSelect.selectedOptions).length > 0;
 
     if (!hasRowSelection) {
-        const defaultRowField = 'sales_date';  // Changed from 'sales_date' to match actual field name
-        const rowOption = Array.from(rowFieldsSelect.options).find(opt => opt.value.toLowerCase() === defaultRowField.toLowerCase());
+        const defaultRowField = 'SALES_DATE';  // Changed from 'sales_date' to match actual field name
+        const rowOption = Array.from(rowFieldsSelect.options).find(opt => opt.value === defaultRowField);
         if (rowOption) {
             rowOption.selected = true;
-            console.log("Default row field 'sales_date' selected.");
+            console.log("Default row field 'SALES_DATE' selected.");
         } else {
-            console.log("Default row field 'sales_date' not found.");
+            console.log("Default row field 'SALES_DATE' not found.");
         }
     }
 
     if (!hasValueSelection) {
-        const defaultValueField = 'act_orders_rev';  // Changed from 'act_orders_rev' to match actual field name
-        const valueOption = Array.from(valueFieldsSelect.options).find(opt => opt.value.toLowerCase() === defaultValueField.toLowerCase());
+        const defaultValueField = 'Act Orders Rev';  // Changed from 'act_orders_rev' to match actual field name
+        const valueOption = Array.from(valueFieldsSelect.options).find(opt => opt.value === defaultValueField);
         if (valueOption) {
             valueOption.selected = true;
-            console.log("Default value field 'act_orders_rev' selected.");
+            console.log("Default value field 'Act Orders Rev' selected.");
         } else {
-            console.log("Default value field 'act_orders_rev' not found.");
-            // If act_orders_rev is not found, try a few alternative names
-            const alternatives = ['Act Orders Rev', 'actual_orders', 'act_rev', 'actual_rev', 'sales'];
-            for (const altField of alternatives) {
-                const altOption = Array.from(valueFieldsSelect.options).find(opt => opt.value.toLowerCase().includes(altField));
-                if (altOption) {
-                    altOption.selected = true;
-                    console.log("Default value field '" + altOption.value + "' selected as alternative.");
-                    break;
-                }
-            }
+            console.log("Default value field 'Act Orders Rev' not found.");
         }
 
         // Also try to select forecast fields if available
-        const forecastOption = Array.from(valueFieldsSelect.options).find(opt => opt.value.toLowerCase().includes('forecast'));
+        const forecastOption = Array.from(valueFieldsSelect.options).find(opt => opt.value.includes('NHITS'));
         if (forecastOption) {
             forecastOption.selected = true;
             console.log("Default forecast field '" + forecastOption.value + "' selected.");

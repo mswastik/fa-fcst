@@ -115,6 +115,7 @@ async def get_raw_data_pivot(request: Request):
         location2 = body.get('location2')
         product1 = body.get('product1')
         product2 = body.get('product2')
+        forecast_version = body.get('forecast_version')
         print(f"Received JSON pivot filter values: location1={location1}, location2={location2}, product1={product1}, product2={product2}")
     except:
         # If JSON parsing fails, try form data (for HTMX calls)
@@ -123,6 +124,7 @@ async def get_raw_data_pivot(request: Request):
         location2 = body.get('location2')
         product1 = body.get('product1')
         product2 = body.get('product2')
+        forecast_version = body.get('forecast_version')
         print(f"Received form pivot filter values: location1={location1}, location2={location2}, product1={product1}, product2={product2}")
 
     # Check if all filters have values - if not, return empty data
@@ -138,7 +140,8 @@ async def get_raw_data_pivot(request: Request):
         location_val=location2,
         product_col=product1,
         product_val=product2,
-        user_id="system"
+        user_id="system",
+        forecast_version=forecast_version
     )
 
     print(f"Data shape from DB: {data.shape}")

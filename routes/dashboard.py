@@ -55,3 +55,8 @@ async def dashboard(request: Request):
         "initial_product_options": initial_product_options,
         "forecast_versions": forecast_versions
     })
+
+@router.get("/modal/forecast-version", response_class=HTMLResponse)
+async def forecast_version_modal(request: Request):
+    """Render the forecast version modal."""
+    return templates.TemplateResponse("partials/version_modal.html", {"request": request})

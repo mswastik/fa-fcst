@@ -700,6 +700,12 @@ class DatabaseService:
         use_direct_skeys = 'item_skey' in forecast_df.columns and 'location_skey' in forecast_df.columns
         logger.info(f"Using direct skeys: {use_direct_skeys}")
 
+        # Use the passed forecast_version, default to "1.0" if None
+        current_model_version = forecast_version if forecast_version is not None else "1.0"
+
+        # Create or get version_id for this forecast run
+        version_id = self._create_or_get_version_id(current_model_version, user_id=user_id)
+
         if use_direct_skeys:
             # Process all records at once when skeys are available directly
             logger.info("Processing records with direct skeys...")
@@ -724,12 +730,6 @@ class DatabaseService:
                 # Fallback if no forecast column is found
                 forecast_values = [0.0] * len(forecast_df)
 
-            # Use the passed forecast_version, default to "1.0" if None
-            current_model_version = forecast_version if forecast_version is not None else "1.0"
-
-            # Create or get version_id for this forecast run
-            version_id = self._create_or_get_version_id(current_model_version, user_id=user_id)
-
             # Process all records in a vectorized way
             for i in range(len(forecast_df)):
                 if item_skeys[i] is None or location_skeys[i] is None:
@@ -747,7 +747,6 @@ class DatabaseService:
                     'forecast_date': forecast_dates[i].strftime('%Y-%m-%d'),  # Format date for SQL
                     'model_type': model_type,
                     'forecast_value': forecast_values[i],
-                    'model_version': current_model_version,
                     'version_id': version_id
                 })
         else:
@@ -819,12 +818,6 @@ class DatabaseService:
                 # Fallback if no forecast column is found
                 forecast_values = [0.0] * len(forecast_df)
 
-            # Use the passed forecast_version, default to "1.0" if None
-            current_model_version = forecast_version if forecast_version is not None else "1.0"
-
-            # Create or get version_id for this forecast run
-            version_id = self._create_or_get_version_id(current_model_version, user_id=user_id)
-
             forecast_dates = forecast_df['forecast_date'].to_list()
             unique_ids_list = forecast_df['unique_id'].to_list()
 
@@ -868,6 +861,13 @@ class DatabaseService:
         logger.info("Database cursor created")
 
         try:
+            # Delete existing forecasts for this version_id
+            delete_query = "DELETE FROM da.forecasts WHERE version_id = ?"
+            cursor.execute(delete_query, (version_id,))
+            deleted_count = cursor.rowcount
+            logger.info(f"Deleted {deleted_count} existing forecast records for version_id {version_id}")
+            print(f"DEBUG: Deleted {deleted_count} existing records for version_id {version_id}")
+
             # Execute in larger batches to improve performance
             batch_size = 5000  # Increase batch size for better performance
             total_records = len(records_to_insert)
@@ -1086,7 +1086,7 @@ class DatabaseService:
         INNER JOIN da.location_hierarchy lh ON f.location_skey = lh.location_skey
         """
 
-        if forecast_version:
+        if forecast_version and forecast_version != 'All':
             forecasts_query += f" WHERE fv.version_name = '{forecast_version}'"
 
         # Combine with UNION ALL
