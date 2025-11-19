@@ -444,17 +444,13 @@
     console.log("Filters cleared.");
 
     updateRawDataView();
-    renderCatalogNumberTable();
-    console.log("Raw data and catalog table rendered.");
-
-    // Update multiselect to TomSelect after DOM updates
-    initializeTomSelects();
-
-    // Also initialize field selectors which may have been updated
-    initializeFieldSelectors();
+    populateFilterFields(); // Call here
+    renderCatalogNumberTable(); // Call here
+    console.log("Raw data, filters and catalog table rendered.");
 
     // Update TomSelect options with new fields after updating available fields
-    updateTomSelectOptions();
+    updateTomSelectOptions(); // This function also re-initializes field selectors
+    console.log("TomSelect options updated and field selectors re-initialized.");
 
     // Apply default selections if none are made
     const rowFieldsSelect = document.getElementById('row-fields');
@@ -565,14 +561,14 @@
         // Initialize TomSelect for dropdowns with search functionality
         if (typeof TomSelect !== 'undefined') {
             initializeTomSelects();
-            initializeFieldSelectors(); // Initialize field selectors separately
+
         }
 
         // Listen for HTMX events to reinitialize TomSelect on dynamically loaded content
         document.addEventListener('htmx:afterOnLoad', function(evt) {
             setTimeout(function() {
                 initializeTomSelects();
-                initializeFieldSelectors(); // Reinitialize field selectors as well
+
             }, 0);
         });
     });
@@ -978,10 +974,6 @@
                     updateChart();
                 };
             }
-
-            populateFilterFields();
-            initializeTomSelects();
-            renderCatalogNumberTable();
         }
 
         function populateFilterFields() {
@@ -1840,20 +1832,21 @@
             }
 
             function generateColors(count, index, alpha = 0.7) {
-                const colors = [
-                    `rgba(102, 126, 234, ${alpha})`,
-                    `rgba(118, 75, 162, ${alpha})`,
-                    `rgba(255, 99, 132, ${alpha})`,
+                // Use brand colors defined as RGB values: gold (255, 181, 0), blue (28, 86, 135), orange (175, 109, 4), purple (133, 69, 138), teal (76, 125, 122)
+                const brandColors = [
+                    `rgba(255, 181, 0, ${alpha})`,    // gold
+                    `rgba(28, 86, 135, ${alpha})`,    // blue
+                    `rgba(175, 109, 4, ${alpha})`,    // orange
+                    `rgba(133, 69, 138, ${alpha})`,   // purple
+                    `rgba(76, 125, 122, ${alpha})`,   // teal
+                    `rgba(178, 180, 174, ${alpha})`,  // gray
+                    `rgba(255, 99, 132, ${alpha})`,   // fallback colors
                     `rgba(54, 162, 235, ${alpha})`,
                     `rgba(255, 205, 86, ${alpha})`,
-                    `rgba(75, 192, 192, ${alpha})`,
-                    `rgba(153, 102, 255, ${alpha})`,
-                    `rgba(255, 159, 64, ${alpha})`,
-                    `rgba(199, 199, 199, ${alpha})`,
-                    `rgba(83, 102, 255, ${alpha})`
+                    `rgba(75, 192, 192, ${alpha})`
                 ];
 
-                return colors[index % colors.length];
+                return brandColors[index % brandColors.length];
             }
 
             function formatNumber(num) {
@@ -2347,14 +2340,14 @@
                         datasets: [{
                             label: 'Accuracy %',
                             data: accuracyData,
-                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(28, 86, 135, 0.5)',  // blue
+                            borderColor: 'rgba(28, 86, 135, 1)',        // blue
                             borderWidth: 1
                         }, {
                             label: 'MAPE %',
                             data: mapeData,
-                            backgroundColor: 'rgba(255, 99, 132, 0.5)',
-                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 181, 0, 0.5)',  // gold
+                            borderColor: 'rgba(255, 181, 0, 1)',        // gold
                             borderWidth: 1
                         }]
                     },

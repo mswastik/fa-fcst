@@ -38,10 +38,10 @@ async def update_filters(
     """
     try:
         db_service = get_database_service()
-        
+
         # Get available options based on current selections
         filter_options = db_service.get_filter_options(user_id="system")
-        
+
         # Determine which options to return based on the filter that changed
         if filter_name == "location1":
             # When location1 changes, we want to update location2 options
@@ -54,7 +54,7 @@ async def update_filters(
                 options = filter_options.get("areas", [])
             else:
                 options = []
-                
+
             # Return updated location2 dropdown
             return templates.TemplateResponse(
                 "partials/location_select2.html",
@@ -76,7 +76,7 @@ async def update_filters(
                 options = filter_options.get("catalog_numbers", [])
             else:
                 options = []
-                
+
             # Return updated product2 dropdown
             return templates.TemplateResponse(
                 "partials/product_select2.html",
@@ -86,7 +86,7 @@ async def update_filters(
                     "options": options
                 }
             )
-            
+
     except Exception as e:
         print(f"Error in update_filters: {e}")
         import traceback
@@ -101,7 +101,7 @@ def generate_filter_select_html(options: List[str], name: str, current_type: str
         'Country': 'Country',
         'Area': 'Area'
     }
-    
+
     # Map product types to appropriate labels
     product_label_mapping = {
         'Franchise': 'Franchise',
@@ -109,7 +109,7 @@ def generate_filter_select_html(options: List[str], name: str, current_type: str
         'IBP Level 6': 'IBP Level 6',
         'CatalogNumber': 'Catalog Number'
     }
-    
+
     # Determine the label based on current type and max width
     if name == 'location2':
         label = label_mapping.get(current_type, 'Location')
@@ -120,7 +120,7 @@ def generate_filter_select_html(options: List[str], name: str, current_type: str
     else:
         label = name.replace('2', '').capitalize()
         max_width_class = 'max-w-[200px]'
-    
+
     # Generate options
     options_html = f'<option value="">Select {label.lower()}...</option>'
     for option in options:
@@ -128,7 +128,7 @@ def generate_filter_select_html(options: List[str], name: str, current_type: str
         if option:
             selected = 'selected' if str(option) == selected_value else ''
             options_html += f'<option value="{option}" {selected}>{option}</option>'
-    
+
     # Return the select element with its container to ensure consistent styling
     # The HTMX attributes are included for the select element to update the dashboard content only
     container_id = f"{name}-container"
@@ -161,7 +161,7 @@ async def update_dashboard(request: Request):
         request.session['session_id'] = session_id
 
     session = state_service.get_or_create_session(session_id)
-    
+
     # Get current filter state from form data
     filter_state = FilterState(
     location1=str(form_data.get('location1', 'Region')) if form_data.get('location1') else 'Region',
@@ -176,7 +176,7 @@ async def update_dashboard(request: Request):
         (filter_state.location1 and filter_state.location2 and filter_state.location2.strip()) and
         (filter_state.product1 and filter_state.product2 and filter_state.product2.strip())
     )
-    
+
     print(f"Load data condition: {load_data_condition}")
     print(f"Filter state: {filter_state}")
     db_service = get_database_service()
@@ -188,12 +188,12 @@ async def update_dashboard(request: Request):
             product_val=filter_state.product2,
             forecast_version=filter_state.forecast_version,
             user_id="system"
-        )            
+        )
         # Apply standard data preparation for UI
         from core.utils import DataUtils
         if filtered_df is not None and not filtered_df.is_empty():
             filtered_df = DataUtils.prepare_data_for_ui(filtered_df)
-        
+
         # Prepare metadata similar to what filter_service provided
         metadata = {
             "total_records": len(filtered_df) if filtered_df is not None and not filtered_df.is_empty() else 0,
@@ -203,29 +203,29 @@ async def update_dashboard(request: Request):
             },
             "columns": list(filtered_df.columns) if filtered_df is not None and not filtered_df.is_empty() else []
         }
-        
+
         print(f"Filtered DataFrame shape: {filtered_df.shape if filtered_df is not None else 'None'}")
         print(f"Metadata: {metadata}")
-        
+
         if filtered_df is not None and not filtered_df.is_empty():
             # Update session with filtered data
             # Update both df and filtered_df with the new filtered data
             # Do not modify full_df which should remain as the original complete dataset
             session.df = filtered_df.clone()
             session.filtered_df = filtered_df.clone()
-            
+
             # Prepare data for charts
             chart_data = session.get_chart_data('line')
             column_chart_data = session.get_chart_data('column')
-            
+
             # Return HTML fragments for charts and table
             chart_html = generate_chart_html(filtered_df, chart_data or {}, column_chart_data or {}, filter_state)
             table_html = generate_table_html(filtered_df, filter_state)
-            
+
             # Return combined HTML for the dashboard content
             combined_html = f"""
             {chart_html}
-            
+
             <!-- Details Table -->
             <div class="w-full h-full p-0">
                 <h3 class="p-2 text-lg font-bold">Select Product and Model data</h3>
@@ -234,7 +234,7 @@ async def update_dashboard(request: Request):
                 </div>
             </div>
             """
-            
+
             return HTMLResponse(content=combined_html)
         else:
             html = f"""
@@ -267,7 +267,7 @@ async def update_dashboard(request: Request):
                 </div>
             </div>
         </div>
-        
+
         <!-- Details Table -->
         <div class="w-full h-full p-0">
             <h3 class="p-2 text-lg font-bold">Select Product and Model data</h3>
@@ -285,26 +285,26 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
     # Generate data for each chart type
     line_chart_script = ""
     column_chart_script = ""
-    
+
     # Prepare line chart data
     if line_chart_data and 'categories' in line_chart_data and 'values' in line_chart_data:
         categories = line_chart_data['categories']
         values = line_chart_data['values']
         forecast_values = line_chart_data.get('forecast_values', [])
-        
+
         # Convert datetime objects to strings for JSON
         categories_json = [str(c) for c in categories]
         values_json = [float(v) if v is not None else None for v in values]
         forecast_values_json = [float(v) if v is not None else None for v in forecast_values] if forecast_values else []
-        
+
         forecast_dataset_str = ""
         if forecast_values_json:
             forecast_dataset_str = f""",
                 {{
                     label: 'Forecast',
                     data: {json.dumps(forecast_values_json)},
-                    borderColor: 'var(--brand-gold)',
-                    backgroundColor: 'rgba(var(--brand-gold-rgb), 0.2)',
+                    borderColor: 'rgb(255, 181, 0)',  // gold
+                    backgroundColor: 'rgba(255, 181, 0, 0.2)',  // gold with transparency
                     borderDash: [5, 5],
                     tension: 0.1,
                     pointRadius: 3
@@ -321,7 +321,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                     if (lineCanvas.chart) {{
                         lineCanvas.chart.destroy();
                     }}
-                    
+
                     // Create new chart instance
                     lineCanvas.chart = new Chart(lineCanvas, {{
                         type: 'line',
@@ -331,8 +331,8 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                                 {{
                                     label: 'Actual',
                                     data: {json.dumps(values_json)},
-                                    borderColor: 'var(--brand-blue)',
-                                    backgroundColor: 'rgba(var(--brand-blue-rgb), 0.2)',
+                                    borderColor: 'rgb(28, 86, 135)',  // blue
+                                    backgroundColor: 'rgba(28, 86, 135, 0.2)',  // blue with transparency
                                     tension: 0.1,
                                     pointRadius: 3
                                 }}
@@ -384,7 +384,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                     }});
                 }}
             }}
-            
+
             // Initialize chart on DOM load if canvas exists
             if (document.getElementById('line-chart-canvas')) {{
                 // If document is already loaded, initialize immediately
@@ -395,7 +395,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                     setTimeout(initLineChart, 100);
                 }}
             }}
-            
+
             // Re-initialize chart when HTMX finishes swapping content
             document.addEventListener('htmx:afterSettle', function(evt) {{
                 // Check if the event target contains our chart or is our chart
@@ -407,27 +407,27 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
             }});
         </script>
         """
-    
+
     # Prepare column chart data
     if column_chart_data and 'months' in column_chart_data and 'series' in column_chart_data:
         months = column_chart_data['months']
         series = column_chart_data['series']
-        
+
         # Prepare datasets from series
         datasets = []
         for i, s in enumerate(series):
             # Assign different colors based on position in series
             color_index = i % 3  # Cycle through 3 main colors
             if color_index == 0:
-                bg_color = 'rgba(var(--brand-blue-rgb), 0.2)'
-                border_color = 'var(--brand-blue)'
+                bg_color = 'rgba(28, 86, 135, 0.2)'  # blue with transparency
+                border_color = 'rgb(28, 86, 135)'  # blue
             elif color_index == 1:
-                bg_color = 'rgba(var(--brand-gold-rgb), 0.2)'
-                border_color = 'var(--brand-gold)'
+                bg_color = 'rgba(255, 181, 0, 0.2)'  # gold with transparency
+                border_color = 'rgb(255, 181, 0)'  # gold
             else:
-                bg_color = 'rgba(var(--brand-orange-rgb), 0.2)'
-                border_color = 'var(--brand-orange)'
-                
+                bg_color = 'rgba(175, 109, 4, 0.2)'  # orange with transparency
+                border_color = 'rgb(175, 109, 4)'  # orange
+
             datasets.append({
                 'label': s.get('name', ''),
                 'data': [float(v) if v is not None else None for v in s.get('data', [])],
@@ -436,7 +436,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                 'borderWidth': 1,
                 'type': s.get('type', 'bar')
             })
-        
+
         column_chart_script = f"""
         <script>
             // Function to initialize or re-initialize the column chart
@@ -447,7 +447,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                     if (columnCanvas.chart) {{
                         columnCanvas.chart.destroy();
                     }}
-                    
+
                     // Create new chart instance
                     columnCanvas.chart = new Chart(columnCanvas, {{
                         type: 'bar',
@@ -487,7 +487,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                     }});
                 }}
             }}
-            
+
             // Initialize chart on DOM load if canvas exists
             if (document.getElementById('column-chart-canvas')) {{
                 // If document is already loaded, initialize immediately
@@ -498,7 +498,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                     setTimeout(initColumnChart, 100);
                 }}
             }}
-            
+
             // Re-initialize chart when HTMX finishes swapping content
             document.addEventListener('htmx:afterSettle', function(evt) {{
                 // Check if the event target contains our chart or is our chart
@@ -510,7 +510,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
             }});
         </script>
         """
-    
+
     # Generate dynamic filter text
     filter_text = ""
     if filter_state and filter_state.location2 and filter_state.product2:
@@ -519,7 +519,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
         filter_text = f"Filters: {filter_state.location2 or 'Not selected'} - {filter_state.product2 or 'Not selected'}"
     else:
         filter_text = "Chart data loaded"
-    
+
     return f"""
     <div id="charts-container" class="flex flex-row lg:flex-row gap-3 mb-3 w-full">
         <div id="column-chart" class="flex-1 shadow-sm rounded p-4" style="min-height: 400px; min-width: 0;">
@@ -549,7 +549,7 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
     """Generate HTML for the details table with HTMX interactions"""
     if df.is_empty():
         return '<div id="details-table"><p class="text-center p-4 text-gray-500">No data available</p></div>'
-    
+
     try:
         # Determine the primary location column to use for indexing
         index_col = None
@@ -562,7 +562,7 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
                 if col in df.columns:
                     index_col = col
                     break
-        
+
         # Define columns needed for pivot, including the index column if it exists
         base_cols = ['SALES_DATE']
         if index_col:
@@ -582,7 +582,7 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
             pl.lit('Forecast').alias('Metric'),
             pl.col('pivot_values').cast(pl.Float64)
         )
-        
+
         # 2. Combine them
         if not actuals_df.is_empty() and not forecast_df.is_empty():
             df_for_pivot = pl.concat([actuals_df, forecast_df])
@@ -615,19 +615,19 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
                 aggregate_function='sum'
             ).sort('Metric')
 
-        
+
         # Generate HTML for the table with HTMX row click functionality
         html = '''
         <div id="details-table" class="overflow-x-auto">
             <table class="min-w-full border-collapse border border-gray-300">
         '''
-        
+
         # Add header
         html += '<thead class="bg-gray-50"><tr>'
         for col in table_df.columns:
             html += f'<th class="border border-gray-300 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{col}</th>'
         html += '</tr></thead>'
-        
+
         # Add rows
         html += '<tbody class="bg-white divide-y divide-gray-200">'
         for row in table_df.iter_rows(named=True):
@@ -635,7 +635,7 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
             row_data_attrs = ""
             for col, value in row.items():
                  row_data_attrs += f'data-{col.lower().replace(" ", "-").replace("/", "-")}="{value}" '
-                
+
             html += f'<tr class="hover:bg-gray-50 cursor-pointer" {row_data_attrs} hx-post="/api/update" hx-include="[name=\'location1\'], [name=\'location2\'], [name=\'product1\'], [name=\'product2\']" hx-target="#dashboard-content" hx-indicator=".htmx-indicator">'
             for cell in row.values():
                 cell_content = str(cell) if cell is not None else ""
@@ -645,7 +645,7 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
                 html += f'<td class="border border-gray-300 px-4 py-2 whitespace-nowrap text-sm text-gray-900">{cell_content}</td>'
             html += '</tr>'
         html += '</tbody></table></div>'
-        
+
         # Add JavaScript for row click handling if needed
         html += """
         <script>
@@ -654,12 +654,12 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
                 const tableRows = document.querySelectorAll('#details-table tbody tr');
                 tableRows.forEach(row => {
                     row.addEventListener('click', function() {
-                        // Extract relevant data from the clicked row 
-                        const productCol = this.getAttribute('data-catalognumber') || 
-                                         this.getAttribute('data-ibp-level-6') || 
-                                         this.getAttribute('data-ibp-level-5') || 
+                        // Extract relevant data from the clicked row
+                        const productCol = this.getAttribute('data-catalognumber') ||
+                                         this.getAttribute('data-ibp-level-6') ||
+                                         this.getAttribute('data-ibp-level-5') ||
                                          this.getAttribute('data-franchise');
-                        
+
                         if (productCol) {
                             // Could trigger additional actions here
                             console.log('Row clicked with product:', productCol);
@@ -669,7 +669,7 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
             });
         </script>
         """
-        
+
         return html
     except Exception as e:
         import traceback
@@ -687,9 +687,9 @@ async def handle_action(request: Request):
         request.session['session_id'] = session_id
 
     session = state_service.get_or_create_session(session_id)
-    
+
     action = form_data.get('action', '')
-    
+
     # Get current filter state from form data
     filter_state = FilterState(
         location1=str(form_data.get('location1', 'Region')) if form_data.get('location1') else 'Region',
@@ -698,12 +698,12 @@ async def handle_action(request: Request):
         product2=str(form_data.get('product2', '')) if form_data.get('product2') else '',
         forecast_version=str(form_data.get('forecast_version', '')) if form_data.get('forecast_version') else ''
     )
-    
+
     try:
         if action == "segmentation":
             # Get current data for clustering
             df = session.df if session.df is not None else session.full_df
-            
+
             if df is None or df.is_empty():
                 html = """
                 <div class="p-4 text-center text-red-500">
@@ -711,24 +711,24 @@ async def handle_action(request: Request):
                 </div>
                 """
                 return HTMLResponse(content=html)
-            
+
             # Import clustering function
             from core.data_service import create_enhanced_clusters
             result_df = create_enhanced_clusters(df, session)
-            
+
             # Update session with clustered data
             session.df = result_df
-            
+
             # Update dashboard content
             chart_data = session.get_chart_data('line') or {}
             column_chart_data = session.get_chart_data('column') or {}
-            
+
             chart_html = generate_chart_html(result_df, chart_data, column_chart_data, filter_state)
             table_html = generate_table_html(result_df, filter_state)
-            
+
             combined_html = f"""
             {chart_html}
-            
+
             <!-- Details Table -->
             <div class="w-full h-full p-0">
                 <h3 class="p-2 text-lg font-bold">Select Product and Model data</h3>
@@ -736,7 +736,7 @@ async def handle_action(request: Request):
                     {table_html}
                 </div>
             </div>
-            
+
             <script>
                 // Show notification
                 if (window.showNotification) {{
@@ -744,9 +744,9 @@ async def handle_action(request: Request):
                 }}
             </script>
             """
-            
+
             return HTMLResponse(content=combined_html)
-        
+
         elif action == "forecast":
             # Check if filters are set
             # Check if both location and product filters have a selected value
@@ -758,7 +758,7 @@ async def handle_action(request: Request):
                 </div>
                 """
                 return HTMLResponse(content=html)
-            
+
             # Load filtered data based on current filters using db_service
             db_service = get_database_service()
             filtered_df = db_service.get_filtered_sales_actuals(
@@ -768,12 +768,12 @@ async def handle_action(request: Request):
                 product_val=filter_state.product2,
                 user_id="system"
             )
-            
+
             # Apply standard data preparation for UI
             from core.utils import DataUtils
             if filtered_df is not None and not filtered_df.is_empty():
                 filtered_df = DataUtils.prepare_data_for_ui(filtered_df)
-            
+
             # Prepare metadata similar to what filter_service provided
             metadata = {
                 "total_records": len(filtered_df) if filtered_df is not None and not filtered_df.is_empty() else 0,
@@ -783,7 +783,7 @@ async def handle_action(request: Request):
                 },
                 "columns": list(filtered_df.columns) if filtered_df is not None and not filtered_df.is_empty() else []
             }
-            
+
             if filtered_df is None or filtered_df.is_empty():
                 html = """
                 <div class="p-4 text-center text-red-500">
@@ -791,7 +791,7 @@ async def handle_action(request: Request):
                 </div>
                 """
                 return HTMLResponse(content=html)
-            
+
             if filtered_df is None or filtered_df.is_empty():
                 html = """
                 <div class="p-4 text-center text-red-500">
@@ -799,7 +799,7 @@ async def handle_action(request: Request):
                 </div>
                 """
                 return HTMLResponse(content=html)
-            
+
             # Run forecasting model (this saves results to the database)
             core_data_service.create_models_action(filtered_df, session, forecast_version=filter_state.forecast_version)
 
@@ -811,7 +811,7 @@ async def handle_action(request: Request):
                 product_val=filter_state.product2,
                 user_id="system"
             )
-            
+
             # Apply standard data preparation for UI
             from core.utils import DataUtils
             if result_df is not None and not result_df.is_empty():
@@ -820,17 +820,17 @@ async def handle_action(request: Request):
             # Update session with the combined data
             session.df = result_df
             session.filtered_df = result_df
-            
+
             # Update dashboard content
             chart_data = session.get_chart_data('line') or {}
             column_chart_data = session.get_chart_data('column') or {}
-            
+
             chart_html = generate_chart_html(result_df, chart_data, column_chart_data, filter_state)
             table_html = generate_table_html(result_df, filter_state)
-            
+
             combined_html = f"""
             {chart_html}
-            
+
             <!-- Details Table -->
             <div class="w-full h-full p-0">
                 <h3 class="p-2 text-lg font-bold">Select Product and Model data</h3>
@@ -838,7 +838,7 @@ async def handle_action(request: Request):
                     {table_html}
                 </div>
             </div>
-            
+
             <script>
                 // Show notification
                 if (window.showNotification) {{
@@ -846,9 +846,9 @@ async def handle_action(request: Request):
                 }}
             </script>
             """
-            
+
             return HTMLResponse(content=combined_html)
-        
+
         elif action == "validate":
             # Placeholder for validation functionality
             html = """
@@ -857,23 +857,23 @@ async def handle_action(request: Request):
             </div>
             """
             return HTMLResponse(content=html)
-        
+
         elif action == "change_fc":
             # Call the existing change_fc function
             result = core_data_service.change_fc_action()
-            
+
             html = f"""
             <div class="p-4 text-center text-blue-500">
                 {result}
             </div>
             """
             return HTMLResponse(content=html)
-        
+
         elif action == "view":
             # Return current data in HTML format for viewing
             if session.df is not None and not session.df.is_empty():
                 table_html = generate_table_html(session.df, filter_state)
-                
+
                 html = f"""
                 <div class="p-4 text-center text-green-500">
                     Data retrieved successfully
@@ -882,7 +882,7 @@ async def handle_action(request: Request):
                     {table_html}
                 </div>
                 """
-                
+
                 return HTMLResponse(content=html)
             else:
                 html = """
@@ -891,7 +891,7 @@ async def handle_action(request: Request):
                 </div>
                 """
                 return HTMLResponse(content=html)
-        
+
         else:
             html = f"""
             <div class="p-4 text-center text-red-500">
@@ -899,7 +899,7 @@ async def handle_action(request: Request):
             </div>
             """
             return HTMLResponse(content=html)
-    
+
     except Exception as e:
         html = f"""
         <div class="p-4 text-center text-red-500">
@@ -937,7 +937,7 @@ async def get_charts(request: Request):
         request.session['session_id'] = session_id
 
     session = state_service.get_or_create_session(session_id)
-    
+
     # Get filter state from session or request
     filter_state = FilterState(
         location1="Region",
@@ -945,11 +945,11 @@ async def get_charts(request: Request):
         product1="Franchise",
         product2=""
     )
-    
+
     if session.filtered_df is not None:
         line_chart_data = session.get_chart_data('line') or {}
         column_chart_data = session.get_chart_data('column') or {}
-        
+
         chart_html = generate_chart_html(session.filtered_df, line_chart_data, column_chart_data, filter_state)
         return HTMLResponse(content=chart_html)
     else:
@@ -964,7 +964,7 @@ async def get_table(request: Request):
         request.session['session_id'] = session_id
 
     session = state_service.get_or_create_session(session_id)
-    
+
     # Get filter state from session or request
     # For now, we'll use default values
     filter_state = FilterState(
@@ -973,7 +973,7 @@ async def get_table(request: Request):
         product1="Franchise",
         product2=""
     )
-    
+
     if session.filtered_df is not None:
         table_html = generate_table_html(session.filtered_df, filter_state)
         return HTMLResponse(content=table_html)
@@ -990,9 +990,9 @@ async def get_regions(request: Request):
         if db_service is not None:
             user_id = request.session.get('user_id', 'system')
             country_query = """
-                SELECT DISTINCT country 
-                FROM da.location_hierarchy 
-                WHERE country IS NOT NULL 
+                SELECT DISTINCT country
+                FROM da.location_hierarchy
+                WHERE country IS NOT NULL
                 ORDER BY country
             """
             country_result = db_service.execute_query(country_query, user_id=user_id)
@@ -1015,11 +1015,11 @@ async def get_agent_table_data(request: Request):
         db_service = get_database_service()
         if db_service is None:
             return JSONResponse({"rows": []})
-        
+
         user_id = request.session.get('user_id', 'system')
         combined_query = """
             WITH yearly_sales AS (
-                SELECT 
+                SELECT
                     p.business_unit,
                     l.country,
                     YEAR(s.sales_date) as sales_year,
@@ -1027,12 +1027,12 @@ async def get_agent_table_data(request: Request):
                 FROM da.sales_actuals s
                 JOIN da.product_hierarchy p ON s.item_skey = p.demantra_item_skey
                 JOIN da.location_hierarchy l ON s.location_skey = l.location_skey
-                WHERE p.business_unit IS NOT NULL 
+                WHERE p.business_unit IS NOT NULL
                 AND l.country IS NOT NULL
                 GROUP BY p.business_unit, l.country, YEAR(s.sales_date)
             ),
             ytd_sales AS (
-                SELECT 
+                SELECT
                     p.business_unit,
                     l.country,
                     YEAR(s.sales_date) as sales_year,
@@ -1040,7 +1040,7 @@ async def get_agent_table_data(request: Request):
                 FROM da.sales_actuals s
                 JOIN da.product_hierarchy p ON s.item_skey = p.demantra_item_skey
                 JOIN da.location_hierarchy l ON s.location_skey = l.location_skey
-                WHERE p.business_unit IS NOT NULL 
+                WHERE p.business_unit IS NOT NULL
                 AND l.country IS NOT NULL
                 AND s.sales_date <= CURRENT_DATE
                 AND YEAR(s.sales_date) >= YEAR(CURRENT_DATE) - 1
@@ -1053,43 +1053,43 @@ async def get_agent_table_data(request: Request):
             ),
             growth_metrics AS (
                 -- Last year's YoY growth (completed year)
-                SELECT 
+                SELECT
                     curr.business_unit,
                     curr.country,
                     'last_year_yoy' as metric_type,
-                    CASE 
-                        WHEN prev.total_sales > 0 THEN 
+                    CASE
+                        WHEN prev.total_sales > 0 THEN
                             ROUND(((curr.total_sales - prev.total_sales) / prev.total_sales) * 100, 2)
                         ELSE NULL
                     END as growth_value
                 FROM yearly_sales curr
-                LEFT JOIN yearly_sales prev ON 
-                    curr.business_unit = prev.business_unit 
-                    AND curr.country = prev.country 
+                LEFT JOIN yearly_sales prev ON
+                    curr.business_unit = prev.business_unit
+                    AND curr.country = prev.country
                     AND curr.sales_year = prev.sales_year + 1
                 WHERE curr.sales_year = YEAR(CURRENT_DATE) - 1
-                
+
                 UNION ALL
-                
+
                 -- Current year YTD growth
-                SELECT 
+                SELECT
                     curr.business_unit,
                     curr.country,
                     'ytd_growth' as metric_type,
-                    CASE 
-                        WHEN prev.ytd_sales > 0 THEN 
+                    CASE
+                        WHEN prev.ytd_sales > 0 THEN
                             ROUND(((curr.ytd_sales - prev.ytd_sales) / prev.ytd_sales) * 100, 2)
                         ELSE NULL
                     END as growth_value
                 FROM ytd_sales curr
-                LEFT JOIN ytd_sales prev ON 
-                    curr.business_unit = prev.business_unit 
-                    AND curr.country = prev.country 
+                LEFT JOIN ytd_sales prev ON
+                    curr.business_unit = prev.business_unit
+                    AND curr.country = prev.country
                     AND curr.sales_year = prev.sales_year + 1
                 WHERE curr.sales_year = YEAR(CURRENT_DATE)
             )
-            SELECT DISTINCT 
-                g.business_unit, 
+            SELECT DISTINCT
+                g.business_unit,
                 g.country,
                 MAX(CASE WHEN g.metric_type = 'last_year_yoy' THEN g.growth_value END) as last_year_yoy,
                 MAX(CASE WHEN g.metric_type = 'ytd_growth' THEN g.growth_value END) as ytd_growth
@@ -1135,23 +1135,23 @@ async def run_agent_stream_api(request: Request):
         search_query2 = data.get('search_query2', '')
         role = data.get('role', 'Demand Planner')
         objective = data.get('objective', '')
-        
+
         # Validate inputs
         if not product or not region:
             return JSONResponse({
                 "success": False,
                 "error": "Both product and region are required"
             })
-        
+
         # Import required modules for the agent functionality
         from ddgs import DDGS
         from bs4 import BeautifulSoup
         import requests
         from openai import OpenAI
         import re
-        
+
         client = OpenAI(base_url="http://localhost:8080/v1", api_key="sk")
-        
+
         def clean_markdown_content(content: str) -> str:
             """
             Clean and normalize markdown content to fix formatting issues.
@@ -1267,7 +1267,7 @@ async def run_agent_stream_api(request: Request):
         # Format the search queries with product and region - with safety checks
         print(f"Received product: '{product}', region: '{region}'")
         print(f"Original search query 1: '{search_query1}', search query 2: '{search_query2}'")
-        
+
         # Safe formatting - replace placeholders with actual values, use fallback if needed
         try:
             formatted_query1 = search_query1.format(product=product, region=region)
@@ -1275,21 +1275,21 @@ async def run_agent_stream_api(request: Request):
             print(f"KeyError in search_query1 formatting: {e}")
             # Fallback to simple replacement
             formatted_query1 = search_query1.replace('{product}', str(product)).replace('{region}', str(region))
-        
+
         try:
             formatted_query2 = search_query2.format(product=product, region=region)
         except KeyError as e:
             print(f"KeyError in search_query2 formatting: {e}")
             # Fallback to simple replacement
             formatted_query2 = search_query2.replace('{product}', str(product)).replace('{region}', str(region))
-        
+
         print(f"Formatted query 1: '{formatted_query1}'")
         print(f"Formatted query 2: '{formatted_query2}'")
-        
+
         async def generate_stream():
             # Send initial status
             yield f"data: {json.dumps({'type': 'status', 'message': f'Running search: {formatted_query1}'})}\n\n"
-            
+
             # Run the first query
             print(f"Starting search for query: {formatted_query1}")
             urls = search_web(formatted_query1)
@@ -1300,7 +1300,7 @@ async def run_agent_stream_api(request: Request):
             else:
                 sources = []
                 all_content = []
-                
+
                 for i, url in enumerate(urls, 1):
                     try:
                         scraped = scrape_page(url)
@@ -1312,22 +1312,22 @@ async def run_agent_stream_api(request: Request):
                             })
                     except Exception as e:
                         print(f"Error processing {url}: {str(e)}")
-                
+
                 print(f"Sources collected: {len(sources)}")
                 print(f"Content chunks collected: {len(all_content)}")
                 yield f"data: {json.dumps({'type': 'status', 'message': sources})}\n\n"
 
                 if all_content:
                     combined_text = "\n---\n".join(all_content)
-                    
+
                     # Send status that we're starting to generate summary
                     yield f"data: {json.dumps({'type': 'status', 'message': 'Generating summary...'})}\n\n"
-                    
+
                     # Stream the summary content
                     full_summary = ""
                     print(f"Sending start_summary event with sources: {sources}")
                     yield f"data: {json.dumps({'type': 'start_summary', 'sources': sources})}\n\n"
-                    
+
                     for chunk in summarize_streaming(
                         combined_text,
                         prompt=(
@@ -1335,7 +1335,7 @@ async def run_agent_stream_api(request: Request):
                             f"The current forecast within Stryker is giving CAGR of 0%. "  # Using 0% as placeholder since we don't have the growth data
                             "Your main task is to look into the web articles provided by user and compare CAGR of Stryker with CAGR forecasts done in these articles. "
                             "Think step by step and provide your reasoning between <think> tags. "
-                            """Always remember below important points while replying: 
+                            """Always remember below important points while replying:
                                 - Do not output disclaimer
                                 - Do not start with Okay
                                 - Be direct and to the point
@@ -1346,13 +1346,13 @@ async def run_agent_stream_api(request: Request):
                         model="qwen-thinking"  # Changed back to qwen-thinking to support thinking content
                     ):
                         full_summary += chunk
-                        
+
                         # Send the chunk as-is without extra processing
                         yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
-                        
+
                         # Small delay to allow proper streaming
                         await asyncio.sleep(0.01)
-                    
+
                     # Send completion signal with full content
                     cleaned_summary = clean_markdown_content(full_summary)
                     print(f"Sending complete event with sources: {sources}")
