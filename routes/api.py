@@ -521,8 +521,8 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
         filter_text = "Chart data loaded"
     
     return f"""
-    <div id="charts-container" class="flex flex-col lg:flex-row gap-3 mb-3 w-full">
-        <div id="column-chart" class="flex-1 border rounded p-4" style="min-height: 400px; min-width: 0;">
+    <div id="charts-container" class="flex flex-row lg:flex-row gap-3 mb-3 w-full">
+        <div id="column-chart" class="flex-1 shadow-sm rounded p-4" style="min-height: 400px; min-width: 0;">
             <div class="flex justify-between items-center mb-2">
                 <h3 class="font-bold">Seasonality</h3>
                 <span class="font-bold text-sm text-gray-600">{filter_text}</span>
@@ -532,7 +532,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
             </div>
             {column_chart_script}
         </div>
-        <div id="line-chart" class="flex-1 border rounded p-4" style="min-height: 400px; min-width: 0;">
+        <div id="line-chart" class="flex-1 shadow-sm rounded p-4" style="min-height: 400px; min-width: 0;">
             <div class="flex justify-between items-center mb-2">
                 <h3 class="font-bold">Trend</h3>
                 <span class="font-bold text-sm text-gray-600">{filter_text}</span>

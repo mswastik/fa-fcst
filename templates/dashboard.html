@@ -3,13 +3,13 @@
 {% block content %}
 <div id="dashboard-container">
     <!-- Filters Row -->
-    <div id="filters-row" class="w-full gap-2 flex mb-4">
-        <div class="min-w-[100px] flex-1 max-w-[150px]">
+    <div id="filters-row" class="w-full gap-2 px-4 flex mb-4">
+        <div class="min-w-[130px] flex-1 max-w-[140px]">
             <label class="block text-sm font-medium text-gray-700">Location</label>
             <select
                 id="location-select1"
                 name="location1"
-                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
                 hx-post="/api/filters"
                 hx-include="[name='location2'], [name='product1'], [name='product2']"
                 hx-target="#location-select2-container"
@@ -28,7 +28,7 @@
             <label class="block text-sm font-medium text-gray-700" id="location2-label">Region</label>
             <select
                 name="location2"
-                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
                 hx-post="/api/update"
                 hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
                 hx-target="#dashboard-content"
@@ -43,12 +43,12 @@
             </select>
         </div>
         
-        <div class="min-w-[140px] flex-1 max-w-[150px]">
+        <div class="min-w-[140px] flex-1 max-w-[160px]">
             <label class="block text-sm font-medium text-gray-700">Product</label>
             <select
                 id="product-select1"
                 name="product1"
-                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
                 hx-post="/api/filters"
                 hx-include="[name='location1'], [name='location2'], [name='product2']"
                 hx-target="#product-select2-container"
@@ -64,11 +64,11 @@
             </select>
         </div>
         
-        <div id="product-select2-container" class="min-w-[160px] flex-1 max-w-[250px]">
+        <div id="product-select2-container" class="min-w-[160px] flex-1 max-w-[200px]">
             <label class="block text-sm font-medium text-gray-700" id="product2-label">Franchise</label>
             <select
                 name="product2"
-                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
                 hx-post="/api/update"
                 hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
                 hx-target="#dashboard-content"
@@ -82,11 +82,11 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="min-w-[160px] flex-1 max-w-[250px]">
+        <div class="min-w-[120px] flex-1 max-w-[160px]">
             <label class="block text-sm font-medium text-gray-700">Forecast Version</label>
             <select
                 name="forecast_version"
-                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
                 hx-post="/api/update"
                 hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2'], [name='forecast_version']"
                 hx-target="#dashboard-content"

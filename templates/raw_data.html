@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
     <!-- Add filtering controls similar to homepage -->
-    <div class="bg-white shadow-sm border-b">
-        <div class="max-w-7xl mx-auto px-2 sm:px-2 lg:px-8 py-2">
+    <div class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto shadow-sm px-2 sm:px-2 lg:px-8 py-2">
             <div class="flex flex-wrap items-center gap-4">
                 <!-- Location 1 Filter -->
-                <div id="location1-container" class="min-w-[160px] flex-1">
+                <div id="location1-container" class="min-w-[120px] flex-1 flex flex-col justify-center">
                     <label class="block text-sm font-medium text-gray-700" id="location1-label">Location</label>
                     <select
                         name="location1"
-                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                        class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
                         hx-post="/api/raw_data/filter_options"
                         hx-include="[name='location1']"
                         hx-target="#location2-container"
@@ -32,7 +32,7 @@
                         <label class="block text-sm font-medium text-gray-700" id="location2-label">{{ initial_location_options[0] }}</label>
                         <select
                             name="location2"
-                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                            class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
                             hx-post="/api/raw_data/pivot"
                             hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
                             hx-indicator=".htmx-indicator"
@@ -54,7 +54,7 @@
                     <label class="block text-sm font-medium text-gray-700" id="product1-label">Product</label>
                     <select
                         name="product1"
-                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                        class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
                         hx-post="/api/raw_data/filter_options"
                         hx-include="[name='product1']"
                         hx-target="#product2-container"
@@ -77,7 +77,7 @@
                         <label class="block text-sm font-medium text-gray-700" id="product2-label">{{ initial_product_options[0] }}</label>
                         <select
                             name="product2"
-                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                            class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
                             hx-post="/api/raw_data/pivot"
                             hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
                             hx-indicator=".htmx-indicator"
@@ -98,7 +98,7 @@
                     <label class="block text-sm font-medium text-gray-700" id="forecast-version-label">Forecast Version</label>
                     <select
                         name="forecast_version"
-                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                        class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
                         hx-post="/api/raw_data/pivot"
                         hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2'], [name='forecast_version']"
                         hx-indicator=".htmx-indicator"
@@ -599,6 +599,7 @@
                         searchPlaceholder: 'Search fields...',
                         maxOptions: 100, // Show more options in dropdown
                         dropdownParent: 'body', // Render dropdown in body to avoid overflow issues
+                        closeAfterSelect: false,
                         render:{
                             option: function(data, escape) {
                                 // Truncate long options for better display
@@ -624,7 +625,33 @@
                             }
                         },
                         onInitialize: function() {
-                            // Additional initialization code if needed
+                            // Set default selections after TomSelect is initialized
+                            setTimeout(function() {
+                                if (id === 'row-fields') {
+                                    const defaultRowField = 'SALES_DATE';
+                                    if (selectElement.options.namedItem(defaultRowField) && !selectElement.tomselect.getValue().includes(defaultRowField)) {
+                                        selectElement.tomselect.addItem(defaultRowField);
+                                    }
+                                } else if (id === 'value-fields') {
+                                    const defaultValueField = 'Act Orders Rev';
+
+                                    // Check and add Act Orders Rev if available
+                                    if (selectElement.options.namedItem(defaultValueField) && !selectElement.tomselect.getValue().includes(defaultValueField)) {
+                                        selectElement.tomselect.addItem(defaultValueField);
+                                    }
+
+                                    // Look for and add any forecast-related fields that might be available
+                                    const options = selectElement.options;
+                                    for (let i = 0; i < options.length; i++) {
+                                        const optionValue = options[i].value;
+                                        // Check for forecast fields that contain common forecast model names
+                                        if ((optionValue.includes('NHITS') || optionValue.includes('forecast') || optionValue.includes('Forecast'))
+                                            && !selectElement.tomselect.getValue().includes(optionValue)) {
+                                            selectElement.tomselect.addItem(optionValue);
+                                        }
+                                    }
+                                }
+                            }, 10); // Small delay to ensure TomSelect is fully initialized
                         }
                     };
 
@@ -758,11 +785,48 @@
                                 }
                             },
                             onInitialize: function() {
+                                // Get the actual TomSelect instance
+                                const tsInstance = selectElement.tomselect || selectElement.ts;
+
                                 // Restore previous selections if they exist
                                 if (currentSelections && currentSelections.length > 0) {
                                     currentSelections.forEach(selection => {
-                                        if (fields.includes(selection)) {
-                                            selectElement.tomselect.addItem(selection);
+                                        if (fields.includes(selection) && tsInstance) {
+                                            // Only add if option exists in the current field list
+                                            if (Array.from(selectElement.options).some(opt => opt.value === selection)) {
+                                                tsInstance.addItem(selection);
+                                            }
+                                        }
+                                    });
+                                }
+
+                                // Always ensure default values are selected regardless of previous selections
+                                // But only if they exist in the current field list
+                                if (id === 'row-fields') {
+                                    const defaultRowField = 'SALES_DATE';
+                                    if (Array.from(selectElement.options).some(opt => opt.value === defaultRowField) &&
+                                        tsInstance && !tsInstance.getValue().includes(defaultRowField)) {
+                                        tsInstance.addItem(defaultRowField);
+                                    }
+                                } else if (id === 'value-fields') {
+                                    const defaultValueField = 'Act Orders Rev';
+                                    const forecastFieldRegex = /NHITS|forecast|Forecast/i;
+
+                                    // Add Act Orders Rev if available and not already selected
+                                    if (Array.from(selectElement.options).some(opt => opt.value === defaultValueField) &&
+                                        tsInstance && !tsInstance.getValue().includes(defaultValueField)) {
+                                        tsInstance.addItem(defaultValueField);
+                                    }
+
+                                    // Look for and add any forecast-related fields that might be available
+                                    // Iterate through all options to find relevant forecast fields
+                                    const options = Array.from(selectElement.options);
+                                    options.forEach(option => {
+                                        const optionValue = option.value;
+                                        // Check for forecast fields that contain common forecast model names
+                                        if (forecastFieldRegex.test(optionValue) &&
+                                            tsInstance && !tsInstance.getValue().includes(optionValue)) {
+                                            tsInstance.addItem(optionValue);
                                         }
                                     });
                                 }

@@ -4,3 +4,4 @@ fcst.duckdb
 __pycache__/
 config/*
 credentials.json
+tailwindcss/*

@@ -6,7 +6,7 @@
     <title>ML Integration Forecast Dashboard</title>
     
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
     
     <!-- TomSelect for searchable selects -->
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
@@ -19,13 +19,14 @@
     <script defer src="/static/js/alpine.min.js"></script>
     
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+    <script src="/static/js/chart.umd.min.js"></script>
     
     <!-- jQuery for PivotTable.js -->
     <script src="/static/js/jquery-3.7.1.min.js"></script>
     
     <!-- PivotTable.js -->
     <script src="/static/js/pivot.js"></script>
+    <link rel="stylesheet" href="/static/css/app.css">
     <link rel="stylesheet" href="/static/css/style.css">
     <!-- Loading indicator for HTMX -->
     <style>
@@ -43,7 +44,7 @@
 <body class="bg-gray-100 min-h-screen">
     <div x-data="{ drawerOpen: false }" class="min-h-screen">
         <!-- Header -->
-        <header class="bg-white shadow-sm border-b py-1">
+        <header class="bg-white shadow-sm">
             <div style="background-color:rgb(var(--black)); color: #FFF;" class="w-full justify-between items-center px-4 py-0 flex">
                 <!-- Left side: App title and navigation -->
                 <div class="items-center gap-4 flex">
