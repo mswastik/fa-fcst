@@ -158,6 +158,7 @@
             regions: [],
             tableData: [],
             selectedRow: null,
+            selectedCagr: '0%', // New property to store the selected CAGR
             outputHtml: '',
             isSearching: false,
             showConfig: false,
@@ -204,6 +205,9 @@
                 this.selectedRow = row;
                 this.product = row.business_unit;
                 this.region = row.country;
+                // Update selected CAGR from last_year_yoy, defaulting to '0%' if null or not a number
+                const cagrValue = row.last_year_yoy;
+                this.selectedCagr = (cagrValue !== null && cagrValue !== undefined) ? `${cagrValue}%` : '0%';
             },
             
             async runAgent() {
@@ -227,7 +231,8 @@
                             search_query1: this.searchQuery1,
                             search_query2: this.searchQuery2,
                             role: this.role,
-                            objective: this.objective
+                            objective: this.objective,
+                            cagr: this.selectedCagr // Add the CAGR value from the selected row
                         })
                     });
                     

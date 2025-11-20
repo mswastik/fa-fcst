@@ -1135,6 +1135,7 @@ async def run_agent_stream_api(request: Request):
         search_query2 = data.get('search_query2', '')
         role = data.get('role', 'Demand Planner')
         objective = data.get('objective', '')
+        cagr = data.get('cagr', '0%') # New variable for CAGR, defaults to '0%'
 
         # Validate inputs
         if not product or not region:
@@ -1237,7 +1238,7 @@ async def run_agent_stream_api(request: Request):
                 print(f"Attempting to scrape page: {url}")
                 html = requests.get(url, timeout=5).text
                 soup = BeautifulSoup(html, "html.parser")
-                content = " ".join([p.get_text() for p in soup.find_all("p")])[:3000]  # limit size
+                content = " ".join([p.get_text() for p in soup.find_all("p")])[:1000]  # limit size
                 print(f"Successfully scraped {len(content)} characters from {url}")
                 return content
             except Exception as e:
@@ -1332,7 +1333,7 @@ async def run_agent_stream_api(request: Request):
                         combined_text,
                         prompt=(
                             f"You are a {role}. Give your reply in concise 100 words and 3 bullet points to {objective} "
-                            f"The current forecast within Stryker is giving CAGR of 0%. "  # Using 0% as placeholder since we don't have the growth data
+                            f"The current forecast within Stryker is giving CAGR of {cagr}. "
                             "Your main task is to look into the web articles provided by user and compare CAGR of Stryker with CAGR forecasts done in these articles. "
                             "Think step by step and provide your reasoning between <think> tags. "
                             """Always remember below important points while replying:
