@@ -6,20 +6,18 @@ import polars as pl
 from typing import Optional, Dict, Any, List, Tuple
 from core.state_manager import DataState, get_global_state
 from core.utils import DataUtils, ErrorHandler
-from mlforecast import MLForecast
-from sklearn.ensemble import RandomForestRegressor, VotingRegressor
-from sklearn.linear_model import LinearRegression
-import xgboost as xgb
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from mlforecast.lag_transforms import RollingMean
-from scipy.stats import pearsonr
+from forecasting.service import ForecastingService
+from dateutil.relativedelta import relativedelta
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
-from contextlib import contextmanager
 import warnings
 from core.db_service import get_database_service
 from utilsforecast.preprocessing import fill_gaps
@@ -287,36 +285,44 @@ def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFram
 
         # Determine the date range for each series and ensure no missing dates within that range
         # This will help prevent the model from seeing gaps as periods to forecast
-        complete_series_data = []
-        for unique_id in filtered_df['unique_id'].unique():
-            series_data = filtered_df.filter(pl.col('unique_id') == unique_id).sort('ds')
-
-            # Get the min and max date for this series
-            min_date = series_data['ds'].min()
-            max_date = datetime.today() - relativedelta(months=1)
-
-            # Create a complete date range for this series
-            if min_date and max_date:
-                date_range = pl.DataFrame({
-                    'ds': pl.date_range(start=min_date, end=max_date, interval='1mo', eager=True).cast(pl.Datetime('us'))
-                })
-
-                # Join with the actual data to fill in missing dates with y=0
-                complete_series = date_range.join(
-                    series_data[['unique_id','ds', 'y']], on='ds', how='left'
-                ).with_columns(
-                    pl.col('y').fill_null(0).fill_nan(0)
-                )
-
-                complete_series_data.append(complete_series)
-
-        #if complete_series_data:
-        filtered_df = pl.concat(complete_series_data)
-        #else:
-            # Fallback: just fill NaN with 0
-        #    filtered_df = filtered_df.with_columns(
-        #        pl.col('y').fill_null(0).fill_nan(0)
-        #    )
+        
+        # 1. Get min date per unique_id
+        ranges = filtered_df.group_by('unique_id').agg(
+            pl.col('ds').min().alias('min_date')
+        )
+        
+        # 2. Define max_date (last complete month)
+        max_date = datetime.today() - relativedelta(months=1)
+        
+        # 3. Generate date ranges for all series at once
+        # This creates a grid of (unique_id, ds) covering min_date to max_date for each series
+        # 3. Generate date ranges using cross join to avoid "non-scalar start" error
+        # Create a global date range from the absolute minimum date to max_date
+        global_min_date = ranges['min_date'].min()
+        all_dates = pl.date_range(
+            start=global_min_date,
+            end=max_date,
+            interval='1mo',
+            eager=True
+        ).cast(pl.Datetime('us')).to_frame('ds')
+        
+        # Cross join unique_ids with all dates
+        # Then filter to keep only dates >= min_date for each series
+        grid = (
+            ranges.select(['unique_id', 'min_date'])
+            .join(all_dates, how='cross')
+            .filter(pl.col('ds') >= pl.col('min_date'))
+            .select(['unique_id', 'ds'])
+        )
+        
+        # 4. Join with actual data to fill gaps with 0
+        filtered_df = grid.join(
+            filtered_df.select(['unique_id', 'ds', 'y']),
+            on=['unique_id', 'ds'],
+            how='left'
+        ).with_columns(
+            pl.col('y').fill_null(0).fill_nan(0)
+        )
 
         # For each series, determine the last date in the historical data
         # This is the cutoff date for forecasting (forecast should only be for future periods)
@@ -326,37 +332,9 @@ def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFram
 
         print(f"Processing {len(valid_ids)} series with last data dates from: {last_date_by_id['max_date'].min()} to {last_date_by_id['max_date'].max()}")
 
-        # Define models - using XGBoost models as in the current code
-        xgb1 = xgb.XGBRegressor(random_state=0, booster='gblinear')
-        xgb2 = xgb.XGBRegressor(random_state=0)
-
-        # Define models for MLForecast - using models that handle NaN values
-        models = {
-            #'rf': RandomForestRegressor(n_estimators=50, random_state=42),
-            'xgb': VotingRegressor([('xgb1', xgb1), ('xgb2', xgb2)])
-        }
-
-        # Use ml_per_series for parallel forecasting - returns polars DataFrame
-        print(f"=== Starting MLForecast for {len(valid_ids)} series ===")
-        print(f"Models: {list(models.keys())}")
-        print(f"Lags: [3, 6, 12]")
-        print(f"Lag transforms: RollingMean(3) on lag 3")
-        print(f"Date features: ['month', tdays]")
-        print(f"Parallel jobs: 1 (sequential processing)")
-        print(f"Min observations per series: {min_data_points}")
-        print("=" * 50)
-
-        forecasts_pl = ml_per_series(
-            idf=filtered_df[['unique_id','ds','y']].fill_nan(0),
-            models=models,
-            horizon=horizon,
-            freq='MS',
-            lags=[3, 6, 12],
-            lag_transforms={3: [RollingMean(3)]},
-            date_features=['month', tdays],
-            n_jobs=1,
-            min_obs=min_data_points,
-        )
+        # Use ForecastingService
+        service = ForecastingService()
+        forecasts_pl = service.run_forecasts(filtered_df, horizon=horizon)
 
         print("=" * 50)
         print(f"=== Forecasting completed ===")
@@ -392,6 +370,14 @@ def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFram
                 .alias('NHITS')
             )
             forecasts_pl = forecasts_pl.drop('xgb')  # Remove the original column
+        elif 'NHITS' in forecasts_pl.columns:
+             # Just ensure non-negative
+             forecasts_pl = forecasts_pl.with_columns(
+                pl.when(pl.col('NHITS') < 0)
+                .then(0)
+                .otherwise(pl.col('NHITS'))
+                .alias('NHITS')
+            )
         else:
             # Use the first available forecast column and rename it to 'NHITS' after applying negative check
             forecast_cols = [col for col in forecasts_pl.columns if col not in ['unique_id', 'ds', 'y']]
@@ -706,143 +692,3 @@ def change_fc_action():
     """Business logic for changing forecast settings"""
     return "Changing forecast settings"
 
-
-def ml_one_series(uid, group_df, models, horizon, freq, lags, lag_transforms, date_features, min_obs=30):
-    """
-    Fit MLForecast on one series (unique_id == uid), predict horizon ahead.
-    Returns a pandas DataFrame with predictions, with 'unique_id' = uid.
-
-    Args:
-        uid: Unique identifier for the series
-        group_df: Pandas DataFrame with columns ds, y for this series
-        models: Dictionary of model instances
-        horizon: Number of periods to forecast
-        freq: Frequency string
-        lags: List of lag values
-        lag_transforms: Dictionary of lag transformations
-        date_features: List of date features
-        min_obs: Minimum observations required
-
-    Returns:
-        Pandas DataFrame with forecasts or None if forecasting fails
-    """
-    import time
-    start_time = time.time()
-
-    # Check if the series has enough data points
-    if len(group_df) < min_obs:
-        print(f"[{uid}] Skipped: Only {len(group_df)} data points (need {min_obs})")
-        return None
-
-    # Check if the series has enough positive values
-    positive_count = (group_df['y'] > 0).sum()
-    if positive_count < min_obs:
-        print(f"[{uid}] Skipped: Only {positive_count} positive values (need {min_obs})")
-        return None
-
-    print(f"[{uid}] Starting forecast with {len(group_df)} data points...")
-    print("Training data date range:")
-    print(f"Start: {group_df['ds'].min()}")
-    print(f"End: {group_df['ds'].max()}")
-    print(f"Today: {datetime.now()}")
-
-    try:
-        # Suppress MLForecast warnings about dropped series
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', message='.*series were dropped completely.*')
-            warnings.filterwarnings('ignore', category=UserWarning)
-
-            fit_start = time.time()
-            # Create and fit the model
-            mfh = MLForecast(
-                models=models,
-                freq=freq,
-                lags=lags,
-                lag_transforms=lag_transforms,
-                date_features=date_features,
-            )
-
-            # Fit the model - use dropna=False to be more lenient
-            mfh.fit(group_df, dropna=False)
-            fit_time = time.time() - fit_start
-            print(f"[{uid}] Model fitting took {fit_time:.2f}s")
-
-            # Predict
-            pred_start = time.time()
-            forecast = mfh.predict(h=horizon)
-            pred_time = time.time() - pred_start
-            print(f"[{uid}] Prediction took {pred_time:.2f}s")
-
-        # Ensure it's a pandas DataFrame and add unique_id
-        if forecast is not None and len(forecast) > 0:
-            forecast['unique_id'] = uid
-            total_time = time.time() - start_time
-            print(f"[{uid}] ✓ Completed in {total_time:.2f}s total")
-            return forecast
-        else:
-            print(f"[{uid}] ✗ No forecast generated")
-            return None
-
-    except ValueError as ve:
-        # Handle specific errors like "Found array with 0 sample(s)"
-        if "Found array with 0 sample" in str(ve) or "minimum of 1 is required" in str(ve):
-            print(f"[{uid}] ✗ Skipped: Insufficient data after transformations")
-        else:
-            print(f"[{uid}] ✗ ValueError: {ve}")
-        return None
-    except Exception as e:
-        elapsed = time.time() - start_time
-        print(f"[{uid}] ✗ Error after {elapsed:.2f}s: {e}")
-        return None
-
-
-def ml_per_series(idf, models, horizon=60, freq='MS', lags=[3,4,5,6,12], lag_transforms={3:[RollingMean(3)]}, date_features=None, n_jobs=-1, min_obs=30):
-    """
-    Parallel per-series forecasting using MLForecast.
-
-    Args:
-        idf: Polars or Pandas DataFrame with columns: unique_id, ds (date), y (target)
-        models: Dictionary of model instances for MLForecast
-        horizon: Number of periods to forecast
-        freq: Frequency string (e.g., 'MS' for month start)
-        lags: List of lag values to use as features
-        lag_transforms: Dictionary of lag transformations
-        date_features: List of date features to extract
-        n_jobs: Number of parallel jobs (-1 for all cores)
-        min_obs: Minimum observations required per series
-
-    Returns:
-        Polars DataFrame with forecasts for all series
-    """
-    # Convert polars DataFrame to pandas for MLForecast compatibility
-    if hasattr(idf, 'to_pandas'):
-        df_pandas = idf.to_pandas()
-    else:
-        df_pandas = idf.copy()
-    try:
-        print("DF Type:"+idf.info())
-    except:
-        pass
-    # Group by unique_id
-    groups = [(uid, group) for uid, group in df_pandas.groupby('unique_id')]
-
-    # Run forecasting with progress bar
-    # Note: Using sequential processing (list comprehension) instead of Parallel for better debugging
-    print(f"Processing {len(groups)} series sequentially...")
-    results = []
-    for i, (uid, group_df) in enumerate(groups, 1):
-        print(f"\n[Progress: {i}/{len(groups)}]")
-        result = ml_one_series(uid, group_df, models, horizon, freq, lags, lag_transforms, date_features, min_obs)
-        results.append(result)
-
-    # Filter out None results and concatenate
-    dfs = [df for df in results if df is not None]
-    print(f"\n✓ Successfully generated forecasts for {len(dfs)} out of {len(groups)} series")
-    if len(dfs) == 0:
-        return pl.DataFrame()
-
-    # Concatenate all forecasts and convert to polars
-    all_forecasts_pd = pd.concat(dfs, ignore_index=True)
-    all_forecasts_pl = pl.from_pandas(all_forecasts_pd)
-
-    return all_forecasts_pl
