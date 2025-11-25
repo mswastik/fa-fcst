@@ -2,29 +2,44 @@
     <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
     <div class="fixed inset-0 z-10 overflow-y-auto">
         <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+            <div
+                class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-lg font-medium leading-6 text-gray-900" id="modal-title">Generate Forecast</h3>
                     <div class="mt-4">
                         <div class="mb-4">
-                            <label for="forecast-version-select" class="block text-sm font-medium text-gray-700">Select an existing version</label>
-                            <select id="forecast-version-select" name="forecast_version" class="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm">
-                                <option value="">-- Select Version --</option>
-                            </select>
+                            <label for="forecast-version-select" class="block text-sm font-medium text-gray-700">Select
+                                an existing version</label>
+                            <div class="mt-1 flex gap-2">
+                                <select id="forecast-version-select" name="forecast_version"
+                                    class="flex-1 rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm">
+                                    <option value="">-- Select Version --</option>
+                                </select>
+                                <button type="button" id="delete-version-btn"
+                                    class="inline-flex py-2 px-4 rounded-md border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 font-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled>Delete</button>
+                            </div>
                         </div>
                         <div class="text-center my-4">OR</div>
                         <div>
-                            <label for="new-forecast-version" class="block font-medium text-gray-700">Create a new version</label>
+                            <label for="new-forecast-version" class="block font-medium text-gray-700">Create a new
+                                version</label>
                             <div class="mt-1 flex rounded-md gap-2">
-                                <input type="text" name="new_forecast_version" id="new-forecast-version" class="block py-2 px-4 font-sm flex-1 rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none" placeholder="New Version Name">
-                                <button type="button" id="create-version-btn" class="inline-flex py-2 font-sm rounded-r-md border border-l-0 border-gray-300 bg-gray-300 px-4 text-gray-800 hover:bg-gray-300">Create</button>
+                                <input type="text" name="new_forecast_version" id="new-forecast-version"
+                                    class="block py-2 px-4 font-sm flex-1 rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none"
+                                    placeholder="New Version Name">
+                                <button type="button" id="create-version-btn"
+                                    class="inline-flex py-2 font-sm rounded-r-md border border-l-0 border-gray-300 bg-gray-300 px-4 text-gray-800 hover:bg-gray-300">Create</button>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                    <button type="button" id="generate-forecast-btn-modal" class="btn inline-flex w-full justify-center rounded-md border border-transparent px-4 py-2 text-base font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm">Generate Forecast</button>
-                    <button type="button" id="cancel-btn" class="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-gray-300 px-4 py-2 text-base font-medium text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                    <button type="button" id="generate-forecast-btn-modal"
+                        class="btn inline-flex w-full justify-center rounded-md border border-transparent px-4 py-2 text-base font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm">Generate
+                        Forecast</button>
+                    <button type="button" id="cancel-btn"
+                        class="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-gray-300 px-4 py-2 text-base font-medium text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
                 </div>
             </div>
         </div>
@@ -44,6 +59,55 @@
             });
         });
 
+    // Enable/disable delete button based on selection
+    document.getElementById('forecast-version-select').addEventListener('change', () => {
+        const selectedVersion = document.getElementById('forecast-version-select').value;
+        const deleteBtn = document.getElementById('delete-version-btn');
+        deleteBtn.disabled = !selectedVersion;
+    });
+
+    // Handle delete version
+    document.getElementById('delete-version-btn').addEventListener('click', () => {
+        const selectedVersion = document.getElementById('forecast-version-select').value;
+        if (!selectedVersion) {
+            alert('Please select a version to delete.');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete version "${selectedVersion}"? This will permanently remove all associated forecast data.`)) {
+            return;
+        }
+
+        fetch('/api/versions/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `version_name=${encodeURIComponent(selectedVersion)}`
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove the option from the dropdown
+                    const select = document.getElementById('forecast-version-select');
+                    const optionToRemove = Array.from(select.options).find(opt => opt.value === selectedVersion);
+                    if (optionToRemove) {
+                        select.removeChild(optionToRemove);
+                    }
+                    // Reset to default
+                    select.value = '';
+                    // Disable delete button
+                    document.getElementById('delete-version-btn').disabled = true;
+                    alert(data.message);
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error deleting version: ' + error);
+            });
+    });
+
     // Handle create version
     document.getElementById('create-version-btn').addEventListener('click', () => {
         const newVersionName = document.getElementById('new-forecast-version').value;
@@ -55,16 +119,18 @@
                 },
                 body: `version_name=${encodeURIComponent(newVersionName)}`
             })
-            .then(response => response.json())
-            .then(data => {
-                const select = document.getElementById('forecast-version-select');
-                const option = document.createElement('option');
-                option.value = data.version_name;
-                option.textContent = data.version_name;
-                select.appendChild(option);
-                select.value = data.version_name;
-                document.getElementById('new-forecast-version').value = '';
-            });
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('forecast-version-select');
+                    const option = document.createElement('option');
+                    option.value = data.version_name;
+                    option.textContent = data.version_name;
+                    select.appendChild(option);
+                    select.value = data.version_name;
+                    document.getElementById('new-forecast-version').value = '';
+                    // Enable delete button for new version
+                    document.getElementById('delete-version-btn').disabled = false;
+                });
         }
     });
 

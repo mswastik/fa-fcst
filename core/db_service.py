@@ -1000,6 +1000,42 @@ class DatabaseService:
             logger.error(f"Error getting forecast versions: {e}")
             return []
 
+    def delete_forecast_version(self, version_name: str, user_id: Optional[str] = None) -> bool:
+        """Delete a forecast version and all associated forecasts."""
+        if not user_id:
+            user_id = "system"
+            
+        logger.info(f"Deleting forecast version: {version_name} for user: {user_id}")
+        
+        conn = duckdb.connect(self.connection_manager._db_path)
+        try:
+            # First get the version_id
+            get_id_query = "SELECT version_id FROM da.forecast_versions WHERE version_name = ?"
+            result = conn.execute(get_id_query, [version_name]).fetchone()
+            
+            if not result:
+                logger.warning(f"Version {version_name} not found")
+                return False
+                
+            version_id = result[0]
+            
+            # Delete from forecasts table
+            delete_forecasts_query = "DELETE FROM da.forecasts WHERE version_id = ?"
+            conn.execute(delete_forecasts_query, [version_id])
+            
+            # Delete from forecast_versions table
+            delete_version_query = "DELETE FROM da.forecast_versions WHERE version_id = ?"
+            conn.execute(delete_version_query, [version_id])
+            
+            logger.info(f"Deleted version {version_name} (id: {version_id}) and associated forecast records")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting forecast version {version_name}: {e}")
+            raise
+        finally:
+            conn.close()
+
     def get_filtered_sales_actuals_with_forecasts(self, location_col: Optional[str] = None, location_val: Optional[str] = None,
                                                 product_col: Optional[str] = None, product_val: Optional[str] = None,
                                                 forecast_version: Optional[str] = None, user_id: Optional[str] = None) -> pl.DataFrame:

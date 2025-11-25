@@ -928,6 +928,19 @@ async def create_version(request: Request, version_name: str = Form(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/api/versions/delete", response_class=JSONResponse)
+async def delete_version(request: Request, version_name: str = Form(...)):
+    """Delete a forecast version."""
+    try:
+        db_service = get_database_service()
+        success = db_service.delete_forecast_version(version_name, user_id="system")
+        if success:
+            return {"success": True, "message": f"Version '{version_name}' deleted successfully"}
+        else:
+            return {"success": False, "message": f"Version '{version_name}' not found"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/api/charts")
 async def get_charts(request: Request):
     """Return chart HTML fragments"""
