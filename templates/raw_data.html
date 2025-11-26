@@ -4,6 +4,22 @@
 <div class="bg-white shadow-sm">
     <div class="max-w-7xl mx-auto shadow-sm px-2 sm:px-2 lg:px-8 py-2">
         <div class="flex flex-wrap items-center gap-4">
+            <!-- Forecast Version Filter -->
+            <div id="forecast-version-container" class="min-w-[160px] flex-1">
+                <label class="block text-sm font-medium text-gray-700" id="forecast-version-label">Forecast
+                    Version</label>
+                <select name="forecast_version"
+                    class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
+                    hx-post="/api/raw_data/pivot"
+                    hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2'], [name='forecast_version']"
+                    hx-indicator=".htmx-indicator" hx-trigger="change" hx-target="body" hx-swap="none"
+                    hx-on:htmx:after-request="initializePivotInterface(event.detail.xhr.response)">
+                    <option value="">Select version...</option>
+                    {% for version in forecast_versions %}
+                    <option value="{{ version }}">{{ version }}</option>
+                    {% endfor %}
+                </select>
+            </div>
             <!-- Location 1 Filter -->
             <div id="location1-container" class="min-w-[120px] flex-1 flex flex-col justify-center">
                 <label class="block text-sm font-medium text-gray-700" id="location1-label">Location</label>
@@ -73,22 +89,6 @@
                 </select>
                 {% endif %}
             </div>
-            <!-- Forecast Version Filter -->
-            <div id="forecast-version-container" class="min-w-[160px] flex-1">
-                <label class="block text-sm font-medium text-gray-700" id="forecast-version-label">Forecast
-                    Version</label>
-                <select name="forecast_version"
-                    class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
-                    hx-post="/api/raw_data/pivot"
-                    hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2'], [name='forecast_version']"
-                    hx-indicator=".htmx-indicator" hx-trigger="change" hx-target="body" hx-swap="none"
-                    hx-on:htmx:after-request="initializePivotInterface(event.detail.xhr.response)">
-                    <option value="">Select version...</option>
-                    {% for version in forecast_versions %}
-                    <option value="{{ version }}">{{ version }}</option>
-                    {% endfor %}
-                </select>
-            </div>
         </div>
     </div>
 </div>
@@ -102,7 +102,7 @@
     </div>
     <div class="sidebar" id="sidebar-left">
         <button class="sidebar-toggle-button" onclick="toggleSidebar('sidebar-left')"><span class="toggle-icon">
-                <<< /span></button>
+                <<< </button>
         <div class="field-group">
             <h4>Rows</h4>
             <select class="field-list field-select" data-zone="rows" id="row-fields" multiple></select>
@@ -136,7 +136,7 @@
     </div>
     <div class="sidebar" id="sidebar-right">
         <button class="sidebar-toggle-button" onclick="toggleSidebar('sidebar-right')"><span class="toggle-icon">
-                <<< /span></button>
+                <<< </button>
         <div class="field-group" style="max-width: 100%;">
             <h4>Catalog Numbers</h4>
             <a href="#" id="reset-catalog-filter" class="btn small"
