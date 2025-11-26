@@ -1,29 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ML Integration Forecast Dashboard</title>
-    
+
     <!-- Tailwind CSS -->
     <!-- <script src="https://cdn.tailwindcss.com"></script> -->
-    
+
     <!-- TomSelect for searchable selects -->
-    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
-    
+    <link href="/static/css/tom-select.css" rel="stylesheet">
+    <script src="/static/js/tom-select.complete.min.js"></script>
+
     <!-- HTMX -->
     <script src="/static/js/htmx.min.js"></script>
-    
+
     <!-- Alpine.js -->
     <script defer src="/static/js/alpine.min.js"></script>
-    
+
     <!-- Chart.js -->
     <script src="/static/js/chart.umd.min.js"></script>
-    
+
     <!-- jQuery for PivotTable.js -->
     <script src="/static/js/jquery-3.7.1.min.js"></script>
-    
+
     <!-- PivotTable.js -->
     <script src="/static/js/pivot.js"></script>
     <link rel="stylesheet" href="/static/css/app.css">
@@ -33,41 +34,51 @@
         .htmx-indicator {
             display: none;
         }
+
         .htmx-request .htmx-indicator {
             display: inline;
         }
+
         .htmx-request.htmx-indicator {
             display: inline;
         }
     </style>
 </head>
+
 <body class="bg-gray-100 min-h-screen">
     <div x-data="{ drawerOpen: false }" class="min-h-screen">
         <!-- Header -->
         <header class="bg-white shadow-sm">
-            <div style="background-color:rgb(var(--black)); color: #FFF;" class="w-full justify-between items-center px-4 py-0 flex">
+            <div style="background-color:rgb(var(--black)); color: #FFF;"
+                class="w-full justify-between items-center px-4 py-0 flex">
                 <!-- Left side: App title and navigation -->
                 <div class="items-center gap-4 flex">
-                    <a href="/" style="color:rgb(var(--gold)); font-family: 'Arial Black';"><span class="text-lg mr-4">ML Integration</span></a>
+                    <a href="/" style="color:rgb(var(--gold)); font-family: 'Arial Black';"><span
+                            class="text-lg mr-4">ML Integration</span></a>
                     <!-- Navigation links -->
                     <div style="font-family: 'Rockwell';" class="items-center gap-1 flex">
-                        <a href="/" class="px-3 py-3 transition-colors duration-200 font-bold no-underline">Dashboard</a>
-                        <a href="/raw_data" class="px-3 py-3 transition-colors duration-200 text-white hover:bg-white hover:text-black">Raw Data</a>
-                        <a href="/agent" class="px-3 py-3 transition-colors duration-200 text-white hover:bg-white hover:text-black no-underline">Agent</a>
+                        <a href="/"
+                            class="px-3 py-3 transition-colors duration-200 font-bold no-underline">Dashboard</a>
+                        <a href="/raw_data"
+                            class="px-3 py-3 transition-colors duration-200 text-white hover:bg-white hover:text-black">Raw
+                            Data</a>
+                        <a href="/agent"
+                            class="px-3 py-3 transition-colors duration-200 text-white hover:bg-white hover:text-black no-underline">Agent</a>
                     </div>
                 </div>
-                
+
                 <!-- Right side: User info and auth buttons -->
                 <div class="items-center gap-4 flex">
                     <div class="items-center gap-x-2 flex">
                         <icon class="text-blue-600 account_circle"></span>
-                        <span class="text-sm text-gray-700">User</span>
+                            <span class="text-sm text-gray-700">User</span>
                     </div>
-                    <button class="btn text-sm hover:bg-gray-100 px-3 py-1 rounded transition-colors duration-200 no-underline">Logout</button>
+                    <button
+                        class="btn text-sm hover:bg-gray-100 px-3 py-1 rounded transition-colors duration-200 no-underline">Logout</button>
                 </div>
             </div>
         </header>
-        
+
         <!-- Main content -->
         <main class="container w-full mx-auto my-0 px-3 py-2">
             <div id="main-content">
@@ -75,9 +86,10 @@
                 {% block content %}{% endblock %}
             </div>
         </main>
-        
+
         <!-- Loading indicator -->
-        <div class="htmx-indicator fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-lg shadow-xl z-50">
+        <div
+            class="htmx-indicator fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-lg shadow-xl z-50">
             <div class="flex flex-col items-center">
                 <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-3"></div>
                 <span>Loading...</span>
@@ -85,4 +97,5 @@
         </div>
     </div>
 </body>
+
 </html>

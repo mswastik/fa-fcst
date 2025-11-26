@@ -463,7 +463,8 @@
             }
 
             if (!hasValueSelection) {
-                const defaultValueField = 'Act Orders Rev';  // Changed from 'act_orders_rev' to match actual field name
+                // Auto-select Act Orders Rev
+                const defaultValueField = 'Act Orders Rev';
                 const valueOption = Array.from(valueFieldsSelect.options).find(opt => opt.value === defaultValueField);
                 if (valueOption) {
                     valueOption.selected = true;
@@ -472,12 +473,17 @@
                     console.log("Default value field 'Act Orders Rev' not found.");
                 }
 
-                // Also try to select forecast fields if available
-                const forecastOption = Array.from(valueFieldsSelect.options).find(opt => opt.value.includes('NHITS'));
-                if (forecastOption) {
-                    forecastOption.selected = true;
-                    console.log("Default forecast field '" + forecastOption.value + "' selected.");
-                }
+                // Auto-select xgb, AutoARIMA, and MSTL forecast models
+                const forecastModels = ['xgb', 'AutoARIMA', 'MSTL'];
+                forecastModels.forEach(model => {
+                    const modelOption = Array.from(valueFieldsSelect.options).find(opt => opt.value === model);
+                    if (modelOption) {
+                        modelOption.selected = true;
+                        console.log(`Default forecast model '${model}' selected.`);
+                    } else {
+                        console.log(`Default forecast model '${model}' not found.`);
+                    }
+                });
             }
 
             // Update custom displays
@@ -797,7 +803,7 @@
                                         }
                                     } else if (id === 'value-fields') {
                                         const defaultValueField = 'Act Orders Rev';
-                                        const forecastFieldRegex = /NHITS|forecast|Forecast/i;
+                                        const forecastModels = ['xgb', 'AutoARIMA', 'MSTL'];
 
                                         // Add Act Orders Rev if available and not already selected
                                         if (Array.from(selectElement.options).some(opt => opt.value === defaultValueField) &&
@@ -805,15 +811,11 @@
                                             tsInstance.addItem(defaultValueField);
                                         }
 
-                                        // Look for and add any forecast-related fields that might be available
-                                        // Iterate through all options to find relevant forecast fields
-                                        const options = Array.from(selectElement.options);
-                                        options.forEach(option => {
-                                            const optionValue = option.value;
-                                            // Check for forecast fields that contain common forecast model names
-                                            if (forecastFieldRegex.test(optionValue) &&
-                                                tsInstance && !tsInstance.getValue().includes(optionValue)) {
-                                                tsInstance.addItem(optionValue);
+                                        // Auto-select xgb, AutoARIMA, and MSTL forecast models
+                                        forecastModels.forEach(model => {
+                                            if (Array.from(selectElement.options).some(opt => opt.value === model) &&
+                                                tsInstance && !tsInstance.getValue().includes(model)) {
+                                                tsInstance.addItem(model);
                                             }
                                         });
                                     }
@@ -969,18 +971,38 @@
 
         function populateFilterFields() {
             const filterFieldSelect = document.getElementById('filter-field');
+            // Save current selection if any
+            const currentSelection = filterFieldSelect.value;
+
             filterFieldSelect.innerHTML = '<option value="">Select Field</option>';
-            const allowedFields = ['stryker_group_region', 'area', 'region', 'country', 'business_sector', 'business_unit', 'franchise', 'product_line', 'ibp_level_5', 'ibp_level_6', 'ibp_level_7', 'catalog_number', 'birch', 'cluster', 'forecast_date', 'model_type', 'data_type'];
+            // Add the 'tom-select' class to the filterFieldSelect element
+            filterFieldSelect.classList.add('tom-select');
+
+            let allowedFields = [];
+
+            // Use keys from currentData if available, otherwise fallback to hardcoded list
+            if (currentData && currentData.length > 0) {
+                allowedFields = Object.keys(currentData[0]).sort();
+            } else {
+                allowedFields = ['stryker_group_region', 'area', 'region', 'country', 'business_sector', 'business_unit', 'franchise', 'product_line', 'ibp_level_5', 'ibp_level_6', 'ibp_level_7', 'catalog_number', 'birch', 'cluster', 'forecast_date', 'model_type', 'data_type'];
+            }
 
             allowedFields.forEach(field => {
                 const option = document.createElement('option');
                 option.value = field;
                 option.textContent = field;
+                if (field === currentSelection) {
+                    option.selected = true;
+                }
                 filterFieldSelect.appendChild(option);
             });
             filterFieldSelect.onchange = updateFilterValueInput;
-        }
 
+            // Sync TomSelect if initialized
+            if (filterFieldSelect.tomselect) {
+                filterFieldSelect.tomselect.sync();
+            }
+        }
         function updateFilterValueInput() {
             const filterField = document.getElementById('filter-field').value;
             const filterValueContainer = document.getElementById('filter-value-container');

@@ -12,11 +12,6 @@ from forecasting.service import ForecastingService
 from forecasting.data_processor import DataCleaner
 from core.db_service import get_database_service
 
-
-
-
-
-
 def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFrame:
     """Create forecasts for each unique_id using MLForecast with parallel processing
 
