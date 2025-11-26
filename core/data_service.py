@@ -67,15 +67,15 @@ def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFram
 
         # Determine the date range for each series and ensure no missing dates within that range
         # This will help prevent the model from seeing gaps as periods to forecast
-        
+
         # 1. Get min date per unique_id
         ranges = filtered_df.group_by('unique_id').agg(
             pl.col('ds').min().alias('min_date')
         )
-        
+
         # 2. Define max_date (last complete month)
         max_date = datetime.today() - relativedelta(months=1)
-        
+
         # 3. Generate date ranges for all series at once
         # This creates a grid of (unique_id, ds) covering min_date to max_date for each series
         # 3. Generate date ranges using cross join to avoid "non-scalar start" error
@@ -87,7 +87,7 @@ def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFram
             interval='1mo',
             eager=True
         ).cast(pl.Datetime('us')).to_frame('ds')
-        
+
         # Cross join unique_ids with all dates
         # Then filter to keep only dates >= min_date for each series
         grid = (
@@ -96,7 +96,7 @@ def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFram
             .filter(pl.col('ds') >= pl.col('min_date'))
             .select(['unique_id', 'ds'])
         )
-        
+
         # 4. Join with actual data to fill gaps with 0
         filtered_df = grid.join(
             filtered_df.select(['unique_id', 'ds', 'y']),
@@ -214,22 +214,22 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_
                         # Determine which columns are model forecasts (exclude metadata columns)
                         metadata_cols = ['unique_id', 'forecast_date', 'item_skey', 'location_skey']
                         model_cols = [col for col in forecast_df.columns if col not in metadata_cols]
-                        
+
                         print(f"\n>>> DEBUG: All columns in forecast_df: {forecast_df.columns}")
                         print(f">>> DEBUG: Model columns detected: {model_cols}")
                         print(f"\n>>> Found {len(model_cols)} models to save: {model_cols}")
-                        
+
                         total_saved = 0
                         for model_col in model_cols:
                             # Create a DataFrame with just this model's forecasts
                             model_forecast_df = forecast_df.select(metadata_cols + [model_col])
-                            
+
                             try:
                                 print(f"\n>>> Inserting {len(model_forecast_df)} forecasts for model: {model_col}")
                                 import time
                                 db_start = time.time()
                                 saved = db_service.insert_forecasts(
-                                    model_forecast_df, 
+                                    model_forecast_df,
                                     model_type=model_col,  # Use the column name as model type
                                     forecast_version=forecast_version,
                                     forecast_value_col=model_col  # Tell it which column has the values
@@ -241,7 +241,7 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_
                                 print(f"Error saving model {model_col}: {model_save_error}")
                                 import traceback
                                 traceback.print_exc()
-                        
+
                         saved_count = total_saved
                         print(f"\n>>> Total saved across all models: {saved_count} forecast records")
                 except Exception as save_error:
@@ -252,9 +252,9 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_
             # Combine historical and forecast data for UI
             # 1. Prepare historical data
             hist_df = original_df.clone()
-            
+
             # Add NULL columns for all model types that might be in forecasts
-            model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'GARCH']
+            model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'AutoCES', 'AutoMFLES']
             for model_col in model_cols:
                 if model_col not in hist_df.columns:
                     hist_df = hist_df.with_columns(pl.lit(None, dtype=pl.Float32).alias(model_col))

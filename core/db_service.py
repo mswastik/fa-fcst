@@ -617,7 +617,7 @@ class DatabaseService:
         Assumes forecast_df has 'unique_id', 'forecast_date' (or 'ds' or 'SALES_DATE'), and forecast columns (e.g., 'Fcst Ensemble Rev').
         If item_skey and location_skey columns are present, uses them directly.
         Otherwise, parses unique_id in Country,CatalogNumber format.
-        
+
         Args:
             forecast_df: DataFrame with forecast data
             model_type: Name of the model (e.g., 'xgb', 'AutoARIMA', etc.)
@@ -726,7 +726,7 @@ class DatabaseService:
                 forecast_values = forecast_df[forecast_value_col].to_list()
             else:
                 # Auto-detect from common column names
-                possible_forecast_cols = ['Fcst Ensemble Rev', 'ensemble', 'NHITS', 'LSTM', 'AutoARIMA', 'MSTL', 'GARCH', 'AutoETS', 'SeasonalNaive', 'xgb']
+                possible_forecast_cols = ['Fcst Ensemble Rev', 'ensemble', 'NHITS', 'LSTM', 'AutoARIMA', 'MSTL', 'AutoCES', 'AutoMFLES', 'AutoETS', 'SeasonalNaive', 'xgb']
                 forecast_value_col_found = None
                 for col in possible_forecast_cols:
                     if col in forecast_df.columns:
@@ -1013,32 +1013,32 @@ class DatabaseService:
         """Delete a forecast version and all associated forecasts."""
         if not user_id:
             user_id = "system"
-            
+
         logger.info(f"Deleting forecast version: {version_name} for user: {user_id}")
-        
+
         conn = duckdb.connect(self.connection_manager._db_path)
         try:
             # First get the version_id
             get_id_query = "SELECT version_id FROM da.forecast_versions WHERE version_name = ?"
             result = conn.execute(get_id_query, [version_name]).fetchone()
-            
+
             if not result:
                 logger.warning(f"Version {version_name} not found")
                 return False
-                
+
             version_id = result[0]
-            
+
             # Delete from forecasts table
             delete_forecasts_query = "DELETE FROM da.forecasts WHERE version_id = ?"
             conn.execute(delete_forecasts_query, [version_id])
-            
+
             # Delete from forecast_versions table
             delete_version_query = "DELETE FROM da.forecast_versions WHERE version_id = ?"
             conn.execute(delete_version_query, [version_id])
-            
+
             logger.info(f"Deleted version {version_name} (id: {version_id}) and associated forecast records")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error deleting forecast version {version_name}: {e}")
             raise
@@ -1098,7 +1098,8 @@ class DatabaseService:
             NULL AS "xgb",
             NULL AS "AutoARIMA",
             NULL AS "MSTL",
-            NULL AS "GARCH",
+            NULL AS "AutoCES",
+            NULL AS "AutoMFLES",
             lh.country AS "Country",
             lh.region AS "Region",
             lh.area AS "Area",
@@ -1123,7 +1124,8 @@ class DatabaseService:
             MAX(CASE WHEN f.model_type = 'xgb' THEN f.forecast_value ELSE NULL END) AS "xgb",
             MAX(CASE WHEN f.model_type = 'AutoARIMA' THEN f.forecast_value ELSE NULL END) AS "AutoARIMA",
             MAX(CASE WHEN f.model_type LIKE 'MSTL%' THEN f.forecast_value ELSE NULL END) AS "MSTL",
-            MAX(CASE WHEN f.model_type LIKE 'GARCH%' THEN f.forecast_value ELSE NULL END) AS "GARCH",
+            MAX(CASE WHEN f.model_type LIKE 'AutoCES%' THEN f.forecast_value ELSE NULL END) AS "AutoCES",
+            MAX(CASE WHEN f.model_type LIKE 'AutoMFLES%' THEN f.forecast_value ELSE NULL END) AS "AutoMFLES",
             lh.country AS "Country",
             lh.region AS "Region",
             lh.area AS "Area",
@@ -1143,7 +1145,7 @@ class DatabaseService:
 
         # Add GROUP BY for the pivot
         forecasts_query += """
-        GROUP BY 
+        GROUP BY
             f.item_skey, f.location_skey, f.forecast_date,
             lh.country, lh.region, lh.area,
             ph.catalog_number, ph.franchise, ph.ibp_level_5, ph.ibp_level_6

@@ -300,13 +300,14 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
             'xgb': {'border': 'rgb(255, 99, 132)', 'bg': 'rgba(255, 99, 132, 0.2)'},  # red
             'AutoARIMA': {'border': 'rgb(54, 162, 235)', 'bg': 'rgba(54, 162, 235, 0.2)'},  # blue
             'MSTL': {'border': 'rgb(255, 206, 86)', 'bg': 'rgba(255, 206, 86, 0.2)'},  # yellow
-            'GARCH': {'border': 'rgb(75, 192, 192)', 'bg': 'rgba(75, 192, 192, 0.2)'}  # teal
+            'AutoCES': {'border': 'rgb(75, 192, 192)', 'bg': 'rgba(75, 192, 192, 0.2)'},  # teal
+            'AutoMFLES': {'border': 'rgb(153, 102, 255)', 'bg': 'rgba(153, 102, 255, 0.2)'}  # purple
         }
-        
+
         for model_name, model_values in forecast_series.items():
             color_config = model_colors.get(model_name, {'border': 'rgb(255, 181, 0)', 'bg': 'rgba(255, 181, 0, 0.2)'})
             forecast_values_json = [float(v) if v is not None else None for v in model_values]
-            
+
             forecast_datasets.append(f"""
                 {{
                     label: '{model_name}',
@@ -588,9 +589,9 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
         )
 
         # For forecasts, find all model columns dynamically
-        model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'GARCH']
+        model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'AutoCES', 'AutoMFLES']
         available_models = [col for col in model_cols if col in df.columns]
-        
+
         forecast_dfs = []
         for model_col in available_models:
             model_forecast_df = df.filter(pl.col(model_col).is_not_null()).select(
