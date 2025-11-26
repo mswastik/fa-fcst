@@ -976,7 +976,7 @@
 
             filterFieldSelect.innerHTML = '<option value="">Select Field</option>';
             // Add the 'tom-select' class to the filterFieldSelect element
-            filterFieldSelect.classList.add('tom-select');
+            //filterFieldSelect.classList.add('tom-select');
 
             let allowedFields = [];
 
@@ -999,9 +999,9 @@
             filterFieldSelect.onchange = updateFilterValueInput;
 
             // Sync TomSelect if initialized
-            if (filterFieldSelect.tomselect) {
-                filterFieldSelect.tomselect.sync();
-            }
+            //if (filterFieldSelect.tomselect) {
+            //    filterFieldSelect.tomselect.sync();
+            //}
         }
         function updateFilterValueInput() {
             const filterField = document.getElementById('filter-field').value;
@@ -1043,7 +1043,15 @@
                     allowEmptyOption: true,
                     maxItems: null, // Allow multiple selections
                     placeholder: 'Select values...',
-                    searchPlaceholder: 'Search values...'
+                    searchPlaceholder: 'Search values...',
+                    onChange: function(value) {
+                        applyFilter(); // Apply filter when selection changes
+                    }
+                });
+            } else {
+                // Fallback event handler for regular select element if TomSelect is not available
+                selectElement.addEventListener('change', function() {
+                    applyFilter(); // Apply filter when selection changes
                 });
             }
         }
