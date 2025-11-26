@@ -8,17 +8,15 @@ from fastapi.templating import Jinja2Templates
 import json
 from typing import Dict, Any, List
 import polars as pl
-import re
 from typing import Optional
 import asyncio
 
-from models.schemas import FilterRequest, UpdateRequest, ActionRequest, FilterState
+from models.schemas import FilterState
 from core.state_manager import state_service
 
 
 import core.data_service as core_data_service
 from core.db_service import get_database_service
-from core.utils import UIUtils
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -290,26 +288,39 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
     if line_chart_data and 'categories' in line_chart_data and 'values' in line_chart_data:
         categories = line_chart_data['categories']
         values = line_chart_data['values']
-        forecast_values = line_chart_data.get('forecast_values', [])
+        forecast_series = line_chart_data.get('forecast_series', {})  # Dict of {model_name: [values]}
 
         # Convert datetime objects to strings for JSON
         categories_json = [str(c) for c in categories]
         values_json = [float(v) if v is not None else None for v in values]
-        forecast_values_json = [float(v) if v is not None else None for v in forecast_values] if forecast_values else []
 
-        forecast_dataset_str = ""
-        if forecast_values_json:
-            forecast_dataset_str = f""",
+        # Build datasets for all forecast models
+        forecast_datasets = []
+        model_colors = {
+            'xgb': {'border': 'rgb(255, 99, 132)', 'bg': 'rgba(255, 99, 132, 0.2)'},  # red
+            'AutoARIMA': {'border': 'rgb(54, 162, 235)', 'bg': 'rgba(54, 162, 235, 0.2)'},  # blue
+            'MSTL': {'border': 'rgb(255, 206, 86)', 'bg': 'rgba(255, 206, 86, 0.2)'},  # yellow
+            'GARCH': {'border': 'rgb(75, 192, 192)', 'bg': 'rgba(75, 192, 192, 0.2)'}  # teal
+        }
+        
+        for model_name, model_values in forecast_series.items():
+            color_config = model_colors.get(model_name, {'border': 'rgb(255, 181, 0)', 'bg': 'rgba(255, 181, 0, 0.2)'})
+            forecast_values_json = [float(v) if v is not None else None for v in model_values]
+            
+            forecast_datasets.append(f"""
                 {{
-                    label: 'Forecast',
+                    label: '{model_name}',
                     data: {json.dumps(forecast_values_json)},
-                    borderColor: 'rgb(255, 181, 0)',  // gold
-                    backgroundColor: 'rgba(255, 181, 0, 0.2)',  // gold with transparency
+                    borderColor: '{color_config["border"]}',
+                    backgroundColor: '{color_config["bg"]}',
                     borderDash: [5, 5],
                     tension: 0.1,
                     pointRadius: 3
                 }}
-            """
+            """)
+
+        # Join all forecast datasets with leading comma if there are any
+        all_forecast_datasets = (',' + ','.join(forecast_datasets)) if forecast_datasets else ''
 
         line_chart_script = f"""
         <script>
@@ -336,7 +347,7 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                                     tension: 0.1,
                                     pointRadius: 3
                                 }}
-                                {forecast_dataset_str}
+                                {all_forecast_datasets}
                             ]
                         }},
                         options: {{
@@ -576,22 +587,23 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
             pl.col('pivot_values').cast(pl.Float64)
         )
 
-        forecast_df = df.filter(pl.col('NHITS').is_not_null()).select(
-            base_cols + [pl.col('NHITS').alias('pivot_values')]
-        ).with_columns(
-            pl.lit('Forecast').alias('Metric'),
-            pl.col('pivot_values').cast(pl.Float64)
-        )
+        # For forecasts, find all model columns dynamically
+        model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'GARCH']
+        available_models = [col for col in model_cols if col in df.columns]
+        
+        forecast_dfs = []
+        for model_col in available_models:
+            model_forecast_df = df.filter(pl.col(model_col).is_not_null()).select(
+                base_cols + [pl.col(model_col).alias('pivot_values')]
+            ).with_columns(
+                pl.lit(f'Forecast-{model_col}').alias('Metric'),
+                pl.col('pivot_values').cast(pl.Float64)
+            )
+            forecast_dfs.append(model_forecast_df)
 
         # 2. Combine them
-        if not actuals_df.is_empty() and not forecast_df.is_empty():
-            df_for_pivot = pl.concat([actuals_df, forecast_df])
-        elif not actuals_df.is_empty():
-            df_for_pivot = actuals_df
-        elif not forecast_df.is_empty():
-            df_for_pivot = forecast_df
-        else:
-            df_for_pivot = pl.DataFrame()
+        all_dfs = [actuals_df] + forecast_dfs
+        df_for_pivot = pl.concat([d for d in all_dfs if not d.is_empty()])
 
 
         if df_for_pivot.is_empty():
@@ -713,7 +725,7 @@ async def handle_action(request: Request):
                 return HTMLResponse(content=html)
 
             # Import clustering function
-            from core.data_service import create_enhanced_clusters
+            from forecasting.features import create_enhanced_clusters
             result_df = create_enhanced_clusters(df, session)
 
             # Update session with clustered data

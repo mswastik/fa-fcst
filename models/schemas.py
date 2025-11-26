@@ -3,7 +3,6 @@ Data models and schemas for the FastAPI application.
 """
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-import polars as pl
 
 class FilterState(BaseModel):
     """Model for filter state"""

@@ -5,7 +5,6 @@ It is not currently integrated into the main FastAPI application.
 """
 import os
 from fastapi import Request
-from fastapi.responses import RedirectResponse
 from authlib.integrations.starlette_client import OAuth
 
 

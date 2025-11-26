@@ -46,22 +46,6 @@ This is a curated list of the most critical functions in the codebase:
 | [`DatabaseService.get_filter_options()`](core/db_service.py:400) | `core/db_service.py` | Retrieves available filter options from hierarchy tables with caching. |
 | [`DuckDBConnectionManager.create_user_connection()`](core/duckdb_connection_manager.py:26) | `core/duckdb_connection_manager.py` | Creates a new, isolated DuckDB connection for a specific user session. |
 | [`fetch_and_save_sales_actuals()`](core/fetchdata.py:62) | `core/fetchdata.py` | Fetches sales actuals from an external ODBC source and saves them to DuckDB. |
-| [`DataUtils.prepare_data_for_ui()`](core/utils.py:70) | `core/utils.py` | Cleans and prepares data (e.g., casting, mapping) for display in the UI. |
-
-### Forecasting and Modeling
-
-| Function | Module | Description |
-| :--- | :--- | :--- |
-| [`run_mlforecast_pipeline()`](core/data_service.py:355) | `core/data_service.py` | Executes the full MLForecast pipeline, including feature engineering and saving results. |
-| [`create_enhanced_clusters()`](core/data_service.py:133) | `core/data_service.py` | Performs data segmentation/clustering for improved model performance. |
-| [`EnsembleForecaster.generate_forecasts()`](forecasting/model_factory.py:204) | `forecasting/model_factory.py` | Main entry point for generating ensemble forecasts across all data clusters. |
-| [`ModelValidator.validate_last_3_months()`](forecasting/model_validator.py:36) | `forecasting/model_validator.py` | Validates all available models (neural and statistical) against recent actuals. |
-| [`ValidationReportGenerator.generate_text_report()`](forecasting/model_validator.py:512) | `forecasting/model_validator.py` | Generates a human-readable summary report of the model validation results. |
-
-### API and UI Interaction
-
-| Function | Module | Description |
-| :--- | :--- | :--- |
 | [`update_filters()`](routes/api.py:26) | `routes/api.py` | FastAPI endpoint to process filter changes and return updated UI fragments (HTMX). |
 | [`handle_action()`](routes/api.py:620) | `routes/api.py` | FastAPI endpoint to trigger long-running actions like Clustering, Model Creation, and Validation. |
 | [`run_agent_stream_api()`](routes/api.py:1077) | `routes/api.py` | FastAPI endpoint for the AI agent, providing a streaming response with web search and summarization capabilities. |

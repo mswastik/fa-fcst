@@ -4,7 +4,7 @@ Centralizes frequently used patterns to reduce code duplication.
 """
 
 import os
-from typing import Dict, Any, Optional
+from typing import Dict
 import polars as pl
 from datetime import datetime
 from json import JSONEncoder

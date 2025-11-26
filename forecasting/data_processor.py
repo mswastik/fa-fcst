@@ -68,6 +68,63 @@ class DataCleaner:
         
         return DataCleaner.filter_last_n_months(clean_df)
 
+    @staticmethod
+    def prepare_data_for_mlforecast(df: pl.DataFrame) -> pl.DataFrame:
+        """Prepare data for MLForecast with required column names"""
+        # Make a copy to avoid modifying original
+        prepared_df = df.clone()
+
+        # Ensure we have the required columns with proper names
+        if 'SALES_DATE' in prepared_df.columns:
+            prepared_df = prepared_df.rename({'SALES_DATE': 'ds'})
+        if 'sales_date' in prepared_df.columns:
+            prepared_df = prepared_df.rename({'sales_date': 'ds'})
+        if 'Act Orders Rev' in prepared_df.columns:
+            prepared_df = prepared_df.rename({'Act Orders Rev': 'y'})
+        if 'act_orders_rev' in prepared_df.columns:
+            prepared_df = prepared_df.rename({'act_orders_rev': 'y'})
+
+        # Ensure 'ds' column is datetime
+        if 'ds' in prepared_df.columns:
+            # Check if column is string type before converting
+            if prepared_df.schema['ds'] == pl.Utf8:
+                prepared_df = prepared_df.with_columns(
+                    pl.col('ds').str.to_datetime(strict=False).alias('ds')
+                )
+            else:
+                prepared_df = prepared_df.with_columns(
+                    pl.col('ds').cast(pl.Datetime).alias('ds')
+                )
+
+        # Ensure 'y' column is numeric
+        if 'y' in prepared_df.columns:
+            prepared_df = prepared_df.with_columns(
+                pl.col('y').cast(pl.Float64).alias('y')
+            )
+            # Remove null or infinite values
+            prepared_df = prepared_df.filter(
+                pl.col('y').is_not_null() &
+                pl.col('y').is_finite()
+            )
+
+        # Ensure we have unique_id
+        if 'unique_id' not in prepared_df.columns:
+            if 'item_skey' in prepared_df.columns and 'location_skey' in prepared_df.columns:
+                prepared_df = prepared_df.with_columns(
+                    (pl.col('item_skey').cast(pl.Utf8) + "_" +
+                     pl.col('location_skey').cast(pl.Utf8)).alias('unique_id')
+                )
+            elif 'Country' in prepared_df.columns and 'CatalogNumber' in prepared_df.columns:
+                prepared_df = prepared_df.with_columns(
+                    (pl.col('Country') + "," + pl.col('CatalogNumber')).alias('unique_id')
+                )
+            else:
+                prepared_df = prepared_df.with_columns(
+                    unique_id=pl.lit("UNKNOWN")
+                )
+
+        return prepared_df
+
 
 class ForecastDataProcessor:
     """Processes forecast data for integration with original dataset."""

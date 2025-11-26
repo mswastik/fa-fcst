@@ -3,7 +3,6 @@ Database models for the FastAPI application.
 """
 from typing import Optional
 from datetime import datetime
-import polars as pl
 
 # This is a simplified version, as most of our DB interactions will use the existing core modules
 class ForecastResult:

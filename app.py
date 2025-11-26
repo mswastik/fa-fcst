@@ -1,21 +1,13 @@
-from fastapi import FastAPI, Request, Depends, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-import json
-from typing import Optional
-from datetime import datetime
-from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 # Import existing modules
-from core.state_manager import DataState, get_global_state
-from core.data_service import apply_filters, create_models_action, change_fc_action
-from core.utils import DataUtils, ErrorHandler
 #from ui.charts import render_column_chart, render_line_chart
-import polars as pl
 
 app = FastAPI(title="ML Integration Forecast Dashboard", version="1.0.0")
 

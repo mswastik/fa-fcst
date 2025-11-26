@@ -2,13 +2,11 @@
 Enhanced Database Service with Multi-User Support
 Supports multiple concurrent users with separate database connections
 """
-import os
 import threading
 import time
 import logging
 import uuid
-from typing import Optional, List, Dict, Any, Tuple
-from datetime import datetime, timedelta
+from typing import Optional, List, Dict, Tuple
 from concurrent.futures import ThreadPoolExecutor
 import polars as pl
 import duckdb
@@ -153,7 +151,6 @@ class DatabaseService:
 
         # Use a temporary direct connection to avoid locking issues
         import duckdb
-        from contextlib import contextmanager
         from time import sleep
         import random
 
@@ -614,12 +611,19 @@ class DatabaseService:
             except:
                 return []
 
-    def insert_forecasts(self, forecast_df: pl.DataFrame, model_type: str, forecast_version: Optional[str] = None, user_id: str = None) -> int:
+    def insert_forecasts(self, forecast_df: pl.DataFrame, model_type: str, forecast_version: Optional[str] = None, user_id: str = None, forecast_value_col: Optional[str] = None) -> int:
         """
         Inserts forecast data into the da.forecasts table.
         Assumes forecast_df has 'unique_id', 'forecast_date' (or 'ds' or 'SALES_DATE'), and forecast columns (e.g., 'Fcst Ensemble Rev').
         If item_skey and location_skey columns are present, uses them directly.
         Otherwise, parses unique_id in Country,CatalogNumber format.
+        
+        Args:
+            forecast_df: DataFrame with forecast data
+            model_type: Name of the model (e.g., 'xgb', 'AutoARIMA', etc.)
+            forecast_version: Version string for this forecast run
+            user_id: User ID
+            forecast_value_col: Name of the column containing forecast values (if None, will auto-detect)
         """
         if not user_id:
             user_id = "system" # Default to system user if not provided
@@ -717,18 +721,23 @@ class DatabaseService:
             forecast_dates = forecast_df['forecast_date'].to_list()
 
             # Handle different possible forecast value columns
-            forecast_value_col = None
-            possible_forecast_cols = ['Fcst Ensemble Rev', 'ensemble', 'NHITS', 'LSTM', 'AutoARIMA', 'AutoETS', 'SeasonalNaive']
-            for col in possible_forecast_cols:
-                if col in forecast_df.columns:
-                    forecast_value_col = col
-                    break
-
-            if forecast_value_col:
+            if forecast_value_col and forecast_value_col in forecast_df.columns:
+                # Use the specified column
                 forecast_values = forecast_df[forecast_value_col].to_list()
             else:
-                # Fallback if no forecast column is found
-                forecast_values = [0.0] * len(forecast_df)
+                # Auto-detect from common column names
+                possible_forecast_cols = ['Fcst Ensemble Rev', 'ensemble', 'NHITS', 'LSTM', 'AutoARIMA', 'MSTL', 'GARCH', 'AutoETS', 'SeasonalNaive', 'xgb']
+                forecast_value_col_found = None
+                for col in possible_forecast_cols:
+                    if col in forecast_df.columns:
+                        forecast_value_col_found = col
+                        break
+
+                if forecast_value_col_found:
+                    forecast_values = forecast_df[forecast_value_col_found].to_list()
+                else:
+                    # Fallback if no forecast column is found
+                    forecast_values = [0.0] * len(forecast_df)
 
             # Process all records in a vectorized way
             for i in range(len(forecast_df)):
@@ -853,7 +862,7 @@ class DatabaseService:
 
         if not records_to_insert:
             logger.warning(f"No valid records to insert after processing. Skipped {skipped_count} records.")
-            print(f"DEBUG: No valid records to insert after processing.")
+            print("DEBUG: No valid records to insert after processing.")
             return 0
 
         cursor = conn.cursor()
@@ -861,12 +870,12 @@ class DatabaseService:
         logger.info("Database cursor created")
 
         try:
-            # Delete existing forecasts for this version_id
-            delete_query = "DELETE FROM da.forecasts WHERE version_id = ?"
-            cursor.execute(delete_query, (version_id,))
+            # Delete existing forecasts for this version_id and model_type
+            delete_query = "DELETE FROM da.forecasts WHERE version_id = ? AND model_type = ?"
+            cursor.execute(delete_query, (version_id, model_type))
             deleted_count = cursor.rowcount
-            logger.info(f"Deleted {deleted_count} existing forecast records for version_id {version_id}")
-            print(f"DEBUG: Deleted {deleted_count} existing records for version_id {version_id}")
+            logger.info(f"Deleted {deleted_count} existing forecast records for version_id {version_id} and model_type {model_type}")
+            print(f"DEBUG: Deleted {deleted_count} existing records for version_id {version_id} and model_type {model_type}")
 
             # Execute in larger batches to improve performance
             batch_size = 5000  # Increase batch size for better performance
@@ -1086,7 +1095,10 @@ class DatabaseService:
             sa.location_skey,
             sa.sales_date AS "SALES_DATE",
             sa.act_orders_rev AS "Act Orders Rev",
-            NULL AS "NHITS",
+            NULL AS "xgb",
+            NULL AS "AutoARIMA",
+            NULL AS "MSTL",
+            NULL AS "GARCH",
             lh.country AS "Country",
             lh.region AS "Region",
             lh.area AS "Area",
@@ -1100,14 +1112,18 @@ class DatabaseService:
         INNER JOIN da.location_hierarchy lh ON sa.location_skey = lh.location_skey
         """
 
-        # Query for Forecasts
+        # Query for Forecasts - pivot so each model type becomes a column
+        # Use conditional aggregation to pivot the data
         forecasts_query = """
         SELECT
             f.item_skey,
             f.location_skey,
             f.forecast_date AS "SALES_DATE",
             NULL AS "Act Orders Rev",
-            f.forecast_value AS "NHITS",
+            MAX(CASE WHEN f.model_type = 'xgb' THEN f.forecast_value ELSE NULL END) AS "xgb",
+            MAX(CASE WHEN f.model_type = 'AutoARIMA' THEN f.forecast_value ELSE NULL END) AS "AutoARIMA",
+            MAX(CASE WHEN f.model_type LIKE 'MSTL%' THEN f.forecast_value ELSE NULL END) AS "MSTL",
+            MAX(CASE WHEN f.model_type LIKE 'GARCH%' THEN f.forecast_value ELSE NULL END) AS "GARCH",
             lh.country AS "Country",
             lh.region AS "Region",
             lh.area AS "Area",
@@ -1124,6 +1140,14 @@ class DatabaseService:
 
         if forecast_version and forecast_version != 'All':
             forecasts_query += f" WHERE fv.version_name = '{forecast_version}'"
+
+        # Add GROUP BY for the pivot
+        forecasts_query += """
+        GROUP BY 
+            f.item_skey, f.location_skey, f.forecast_date,
+            lh.country, lh.region, lh.area,
+            ph.catalog_number, ph.franchise, ph.ibp_level_5, ph.ibp_level_6
+        """
 
         # Combine with UNION ALL
         full_query = f"""

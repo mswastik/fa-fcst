@@ -5,7 +5,6 @@ Replaces global variables with proper state management.
 from typing import Optional, List, Dict, Any
 import polars as pl
 from dataclasses import dataclass, field
-from datetime import datetime
 from core.utils import DataUtils, ErrorHandler
 from core.db_service import get_database_service
 
@@ -309,16 +308,28 @@ class DataState:
         # Group by Year and Month for actuals
         agg_actuals = chart_data.group_by(['Year', 'Month']).sum()['Year', 'Month', 'Act Orders Rev']
         
-        # Group by Year and Month for forecasts (only if NHITS exists)
+        # Group by Year and Month for forecasts - sum all model columns
+        model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'GARCH']
+        available_models = [col for col in model_cols if col in chart_data.columns]
+        
         agg_forecasts = None
-        if 'NHITS' in chart_data.columns:
-            agg_forecasts = chart_data.group_by(['Year', 'Month']).sum()['Year', 'Month', 'NHITS']
+        if available_models:
+            # Sum all available model forecasts
+            agg_base = chart_data.group_by(['Year', 'Month']).agg([
+                pl.sum(col).alias(col) for col in available_models
+            ])
+            
+            # Create a total forecast column by averaging all models
+            # (you can change this to sum if preferred)
+            agg_forecasts = agg_base.with_columns(
+                pl.mean_horizontal([pl.col(c) for c in available_models]).alias('Forecast_Avg')
+            ).select(['Year', 'Month', 'Forecast_Avg'])
         
         # Merge actuals and forecasts
         if agg_forecasts is not None:
             agg_data = agg_actuals.join(agg_forecasts, on=['Year', 'Month'], how='outer')
         else:
-            agg_data = agg_actuals.with_columns(pl.lit(None).alias('NHITS'))
+            agg_data = agg_actuals.with_columns(pl.lit(None).alias('Forecast_Avg'))
         
         # Sort by Year and then by Month
         month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
@@ -346,7 +357,7 @@ class DataState:
                 if len(month_row) > 0:
                     actual_values.append(month_row['Act Orders Rev'][0] if len(month_row) > 0 else None)
                     forecast_values.append(
-                        month_row['NHITS'][0] if 'NHITS' in month_row.columns and len(month_row) > 0 else None
+                        month_row['Forecast_Avg'][0] if 'Forecast_Avg' in month_row.columns and len(month_row) > 0 else None
                     )
                 else:
                     actual_values.append(None)
@@ -363,7 +374,7 @@ class DataState:
             
             if any(fv is not None for fv in forecast_values):
                 series_data.append({
-                    'name': f'{year} - Forecast',
+                    'name': f'{year} - Forecast (Avg)',
                     'type': 'line',
                     'data': forecast_values,
                     'color': current_color,
@@ -376,22 +387,33 @@ class DataState:
         }
     
     def _get_line_chart_data(self, chart_data: pl.DataFrame) -> Dict[str, Any]:
-        """Generate line chart data."""
+        """Generate line chart data with all forecast models."""
         chart_data = chart_data.sort('group')
         # Aggregate by date for line chart
         agg_data = chart_data.group_by('group').sum()['group', 'Act Orders Rev']
-        forecast_values = []
-        if 'NHITS' in chart_data.columns:
-            nhits_agg = chart_data.group_by('group').sum()['group', 'NHITS']
-            # Join with agg_data to get NHITS values  
-            agg_data = agg_data.join(nhits_agg, on='group', how='left')
-            forecast_values = agg_data['NHITS'].to_list()
+        
+        # Process all available model forecasts separately
+        model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'GARCH']
+        available_models = [col for col in model_cols if col in chart_data.columns]
+        
+        forecast_series = {}
+        if available_models:
+            # Aggregate forecasts for each model separately
+            for model in available_models:
+                forecast_agg = chart_data.group_by('group').agg([
+                    pl.sum(model).alias(model)
+                ]).select(['group', model])
+                
+                # Join with agg_data
+                agg_data = agg_data.join(forecast_agg, on='group', how='left')
+                forecast_series[model] = agg_data[model].to_list()
+        
         x_values = agg_data['group'].to_list()
         
         return {
             'categories': x_values,
             'values': agg_data['Act Orders Rev'].to_list(),
-            'forecast_values': forecast_values
+            'forecast_series': forecast_series  # Dictionary with all model forecasts
         }
 
 

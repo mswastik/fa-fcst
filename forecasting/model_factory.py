@@ -2,11 +2,11 @@
 Model factory for creating and configuring forecasting models.
 Extracted from data_service.py for better separation of concerns.
 """
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple
 import polars as pl
 from neuralforecast import NeuralForecast
-from neuralforecast.models import NHITS, LSTM, MLP
-from neuralforecast.losses.pytorch import RMSE, MAE
+from neuralforecast.models import NHITS, LSTM
+from neuralforecast.losses.pytorch import RMSE
 from statsforecast import StatsForecast
 from statsforecast.models import AutoARIMA, AutoETS, SeasonalNaive
 

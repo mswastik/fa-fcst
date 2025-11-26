@@ -1,22 +1,15 @@
 """
 Dashboard routes for the FastAPI application.
 """
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-import json
-from typing import Dict, Any
-import polars as pl
-import pandas as pd
-import numpy as np
 
 from models.schemas import FilterState
 from core.state_manager import state_service
 
 #from services.data_service import data_service
 from core.db_service import get_database_service
-from core.utils import UIUtils, CustomJsonEncoder
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")

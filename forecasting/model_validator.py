@@ -5,9 +5,9 @@ before each validation month to simulate real-world 3-month ahead forecasting.
 """
 import polars as pl
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional
 from dataclasses import dataclass
 #from forecasting.model_factory import EnsembleForecaster
 #from forecasting.simple_forecaster import SimpleModelPipeline
@@ -136,7 +136,7 @@ class ModelValidator:
                                 validation_month: datetime) -> Optional[ValidationMetrics]:
         """Validate ensemble model."""
         try:
-            print(f"  Validating ensemble model...")
+            print("  Validating ensemble model...")
             
             # Create forecaster and generate forecasts
             forecaster = EnsembleForecaster(horizon=60)
@@ -226,7 +226,6 @@ class ModelValidator:
         try:
             print(f"  Validating {model_name} model...")
             
-            from forecasting.model_factory import StatisticalModelFactory
             from statsforecast import StatsForecast
             from statsforecast.models import AutoARIMA, AutoETS, SeasonalNaive
             

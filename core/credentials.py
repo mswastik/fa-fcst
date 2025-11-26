@@ -4,7 +4,7 @@ Handles loading credentials from secure configuration files.
 """
 import os
 import json
-from typing import Dict, Optional
+from typing import Dict
 
 
 class CredentialsManager:

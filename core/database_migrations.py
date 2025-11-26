@@ -2,7 +2,6 @@
 Database migrations for forecast schema changes
 """
 import duckdb
-from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -84,7 +83,7 @@ def migrate_forecast_schema(db_path: str = "fcst.duckdb"):
 
     # Drop all indexes on the forecasts table to be safe
     try:
-        indexes = conn.execute(f"""
+        indexes = conn.execute("""
             SELECT index_name
             FROM duckdb_indexes()
             WHERE table_name = 'forecasts' AND schema_name = 'da'

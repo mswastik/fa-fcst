@@ -4,15 +4,13 @@ Handles the execution of forecasting models, including per-series logic and shor
 """
 import polars as pl
 import pandas as pd
-import numpy as np
-from typing import Dict, Any, List, Optional, Union
 from mlforecast import MLForecast
 from mlforecast.lag_transforms import RollingMean
 from sklearn.ensemble import VotingRegressor
 import xgboost as xgb
+from statsforecast.core import StatsForecast
+from statsforecast.models import AutoARIMA, MSTL, GARCH
 import warnings
-import time
-from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 class ForecastingService:
@@ -43,7 +41,7 @@ class ForecastingService:
         
         forecast_df = pd.DataFrame({
             'ds': future_dates,
-            'NHITS': [mean_val] * horizon, # Using NHITS as the column name for consistency
+            'xgb': [mean_val] * horizon,
             'unique_id': uid
         })
         
@@ -95,74 +93,104 @@ class ForecastingService:
 
     def run_forecasts(self, df: pl.DataFrame, horizon: int = 60) -> pl.DataFrame:
         """
-        Run forecasts for all series in the dataframe.
+        Run forecasts for all series in the dataframe using multiple models.
         """
-        # Convert to pandas for MLForecast (it handles pandas groups better for now in this custom loop)
-        # Note: User asked to use Polars natively with MLForecast. 
-        # However, since we are doing a custom per-series loop, we are slicing the dataframe.
-        # Slicing Polars is fast, but MLForecast.fit() on a single series Polars DF might be tricky if it expects specific structure.
-        # Let's try to keep it Polars if possible, but for the per-series loop, converting the *group* to pandas might be safer 
-        # given the existing logic, OR we can try passing Polars frame to MLForecast.
-        # MLForecast supports Polars.
-        
-        # Let's try to use Polars for the loop if possible, or just convert the chunks.
-        # Actually, for the "per series" requirement, we have to iterate.
-        
         # Optimization: We can use Polars partition_by to get list of DataFrames
         groups = df.partition_by("unique_id", as_dict=True)
         
-        # Define models
+        # Define MLForecast models (XGBoost)
         xgb1 = xgb.XGBRegressor(random_state=0, booster='gblinear')
         xgb2 = xgb.XGBRegressor(random_state=0)
-        models = {
+        ml_models = {
             'xgb': VotingRegressor([('xgb1', xgb1), ('xgb2', xgb2)])
         }
+        
+        # Define StatsForecast models
+        sf_models = [
+            AutoARIMA(season_length=12),
+            MSTL(season_length=[12]),
+            GARCH(p=1, q=1)
+        ]
         
         results = []
         print(f"Processing {len(groups)} series...")
         
         for uid, group_pl in groups.items():
-            # Convert to pandas for the single series fit if needed, or pass Polars if MLForecast supports it for single series
-            # MLForecast expects 'ds', 'y', 'unique_id'
-            # For short series logic, we need to access data.
+            uid_str = str(uid[0]) if isinstance(uid, tuple) else str(uid)
             
-            # Using pandas for the single series interaction is likely fine and robust enough for now, 
-            # as the overhead is small per series compared to fitting.
-            # But let's try to stick to Polars for the data passing if MLForecast accepts it.
-            # MLForecast fit accepts Polars DataFrame.
-            
-            # However, our _get_short_series_forecast needs to handle it.
-            
-            # Let's convert to pandas for the *internal* logic of this method to be safe with existing MLForecast usage patterns 
-            # in this specific codebase, but the input to this function is Polars.
-            # Actually, the user specifically asked to "Use Polars natively".
-            # So I should try to use Polars inside `ml_one_series` too.
-            
-            # Converting the single group to pandas for MLForecast is NOT what they meant by "Use Polars natively". 
-            # They meant avoid `idf.to_pandas()` which converts the *entire* dataset at once.
-            
-            # But `MLForecast` with `fit` on a single series... 
-            # If I pass a Polars DF to `fit`, it works.
-            
-            # So let's try to use Polars in `ml_one_series`.
-            
-            res = self.ml_one_series_polars(
-                uid=str(uid[0]) if isinstance(uid, tuple) else str(uid), 
+            # 1. Run MLForecast (XGBoost)
+            ml_res = self.ml_one_series_polars(
+                uid=uid_str, 
                 group_df=group_pl, 
-                models=models, 
+                models=ml_models, 
                 horizon=horizon,
                 freq='1mo',
                 lags=[3, 6, 12],
                 lag_transforms={3: [RollingMean(3)]},
                 date_features=['month']
             )
-            if res is not None:
-                results.append(res)
+            
+            # 2. Run StatsForecast (AutoARIMA, MSTL, GARCH)
+            # StatsForecast expects pandas DataFrame with unique_id, ds, y
+            group_pd = group_pl.to_pandas()
+            if 'unique_id' not in group_pd.columns:
+                group_pd['unique_id'] = uid_str
+            
+            try:
+                sf = StatsForecast(
+                    models=sf_models,
+                    freq='MS',
+                    n_jobs=1
+                )
+                sf.fit(group_pd)
+                sf_res = sf.predict(h=horizon)
+                
+                # Convert to Polars
+                sf_res_pl = pl.from_pandas(sf_res)
+                
+                # Rename 'ds' to match if needed (StatsForecast returns 'ds')
+                # Ensure unique_id is present
+                if 'unique_id' not in sf_res_pl.columns:
+                    sf_res_pl = sf_res_pl.with_columns(pl.lit(uid_str).alias('unique_id'))
+                
+            except Exception as e:
+                print(f"[{uid_str}] Error in StatsForecast: {e}")
+                sf_res_pl = None
+
+            # 3. Merge results with type casting to Float32
+            if ml_res is not None and sf_res_pl is not None:
+                # Join on unique_id and ds
+                # ml_res has: unique_id, ds, xgb
+                # sf_res_pl has: unique_id, ds, AutoARIMA, MSTL, GARCH
+                
+                # Ensure ds types match and cast all forecast columns to Float32
+                ml_res = ml_res.with_columns(pl.col('ds').cast(pl.Datetime))
+                sf_res_pl = sf_res_pl.with_columns(pl.col('ds').cast(pl.Datetime))
+                
+                # Cast forecast columns to Float32 for consistency
+                for col in [c for c in ml_res.columns if c not in ['unique_id', 'ds']]:
+                    ml_res = ml_res.with_columns(pl.col(col).cast(pl.Float32))
+                for col in [c for c in sf_res_pl.columns if c not in ['unique_id', 'ds']]:
+                    sf_res_pl = sf_res_pl.with_columns(pl.col(col).cast(pl.Float32))
+                
+                combined = ml_res.join(sf_res_pl, on=['unique_id', 'ds'], how='left')
+                results.append(combined)
+                
+            elif ml_res is not None:
+                # Cast to Float32
+                for col in [c for c in ml_res.columns if c not in ['unique_id', 'ds']]:
+                    ml_res = ml_res.with_columns(pl.col(col).cast(pl.Float32))
+                results.append(ml_res)
+            elif sf_res_pl is not None:
+                # Cast to Float32
+                for col in [c for c in sf_res_pl.columns if c not in ['unique_id', 'ds']]:
+                    sf_res_pl = sf_res_pl.with_columns(pl.col(col).cast(pl.Float32))
+                results.append(sf_res_pl)
 
         if not results:
             return pl.DataFrame()
             
-        return pl.concat(results)
+        return pl.concat(results, how='diagonal')
 
     def ml_one_series_polars(self, uid, group_df: pl.DataFrame, models, horizon, freq, lags, lag_transforms, date_features, min_obs=12):
         """
@@ -203,17 +231,14 @@ class ForecastingService:
                     forecast = pl.from_pandas(forecast)
                 
                 if not forecast.is_empty():
-                    # Rename model column to NHITS if needed and ensure column order
+                    # Ensure column order
                     cols = forecast.columns
-                    model_col = next((c for c in cols if c not in ['ds', 'unique_id']), None)
-                    
-                    if model_col:
-                        forecast = forecast.rename({model_col: 'NHITS'})
                     
                     forecast = forecast.with_columns(pl.lit(uid).alias('unique_id'))
                     
-                    # Ensure consistent column order: unique_id, ds, NHITS
-                    return forecast.with_columns(pl.col('NHITS').cast(pl.Float64)).select(['unique_id', 'ds', 'NHITS'])
+                    # Ensure consistent column order: unique_id, ds, xgb
+                    # We don't rename to NHITS anymore
+                    return forecast
                 return None
                 
         except Exception as e:
@@ -248,6 +273,6 @@ class ForecastingService:
         return pl.DataFrame({
             'unique_id': [uid] * len(dates),
             'ds': dates,
-            'NHITS': [mean_val] * len(dates)
-        }).with_columns(pl.col('NHITS').cast(pl.Float64)).select(['unique_id', 'ds', 'NHITS'])
+            'xgb': [mean_val] * len(dates)
+        }).with_columns(pl.col('xgb').cast(pl.Float32)).select(['unique_id', 'ds', 'xgb'])
 

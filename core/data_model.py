@@ -1,6 +1,4 @@
-import polars as pl
 from core.state_manager import get_global_state
-from typing import Optional, Dict, Any
 
 # Remove early state access - make it lazy
 # state = get_global_state()  # This causes import-time error

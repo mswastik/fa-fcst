@@ -34,8 +34,9 @@ graph TD
 
     subgraph ForecastingModule["Forecasting Module"]
         D -- Data Prep --> K(Data Processor)
-        D -- Model Creation --> L(Model Factory)
-        D -- Validation --> M(Model Validator)
+        D -- Features --> L(Features)
+        D -- Model Creation --> M(Model Factory)
+        D -- Validation --> N(Model Validator)
     end
 
     D -- Read/Write --> I
@@ -75,8 +76,8 @@ graph TD
 
     G --> D
     G --> K(forecasting/data_processor.py)
-    G --> L(forecasting/model_factory.py)
-    G --> M(forecasting/model_validator.py)
+    G --> L(forecasting/features.py)
+    G --> M(forecasting/service.py)
 
     E --> C
     E --> G
@@ -84,7 +85,6 @@ graph TD
     K --> D
     L --> K
     M --> K
-    M --> L
 ```
 
 ## 3. Forecasting Pipeline Flow
@@ -104,9 +104,9 @@ sequenceDiagram
     UI->>API: POST /api/actions (ActionRequest: 'Create Models')
     API->>State: set_loading_state('charts', True)
     API->>DS: run_mlforecast_pipeline(filtered_df)
-    DS->>DS: prepare_data_for_mlforecast()
+    DS->>DS: DataCleaner.prepare_data_for_mlforecast()
     DS->>DS: create_mlforecast_models()
-    DS->>FM: EnsembleForecaster.generate_forecasts()
+    DS->>FM: ForecastingService.run_forecasts()
     FM-->>DS: Forecasts (pl.DataFrame)
     DS->>DB: insert_forecasts(forecast_df)
     DB-->>DS: Success
@@ -122,3 +122,4 @@ sequenceDiagram
         MV-->>API: ValidationMetrics
         API->>UI: UpdateResponse (HTML for Validation Dialog)
     end
+```

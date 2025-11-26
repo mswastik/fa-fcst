@@ -2,10 +2,8 @@ from arrow_odbc import read_arrow_batches_from_odbc
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import polars as pl
-import os
 import pyodbc
 #from utils import ErrorHandler
-import duckdb
 import json
 
 drivers = sorted(pyodbc.drivers())
@@ -64,8 +62,6 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
     Fetch sales actuals data using arrow_odbc and save to DuckDB da.sales_actuals table
     with bucketed approach to handle memory allocation issues
     """
-    from datetime import datetime, timedelta
-    from dateutil.relativedelta import relativedelta
     import traceback
 
     print("Starting fetch_and_save_sales_actuals function...")
@@ -271,8 +267,6 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
             print("Creating arrow reader...")
 
             # Create a function that handles the ODBC connection with timeout
-            import signal
-            import threading
             from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
             # Using ThreadPoolExecutor to handle timeout for the ODBC call

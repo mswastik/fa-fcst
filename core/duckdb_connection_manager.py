@@ -2,7 +2,6 @@
 DuckDB Connection Manager with Multi-User Support
 Supports multiple concurrent users with separate database connections
 """
-import os
 import threading
 import time
 from typing import Dict, Optional, Any

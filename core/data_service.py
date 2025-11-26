@@ -3,236 +3,18 @@ Simplified Data service module for FCST application.
 Provides data loading, processing, and forecasting functionality using MLForecast.
 """
 import polars as pl
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, Tuple
 from core.state_manager import DataState, get_global_state
-from core.utils import DataUtils, ErrorHandler
+from core.utils import DataUtils
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-import numpy as np
-import pandas as pd
-from sklearn.preprocessing import LabelEncoder, StandardScaler
 from forecasting.service import ForecastingService
-from dateutil.relativedelta import relativedelta
-import numpy as np
-import pandas as pd
-from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
-import warnings
+from forecasting.data_processor import DataCleaner
 from core.db_service import get_database_service
-from utilsforecast.preprocessing import fill_gaps
 
 
-def calculate_seasonal_strength(ts, period):
-    """Calculate seasonal strength using STL decomposition approach"""
-    if len(ts) < 2 * period:
-        return 0
 
-    try:
-        # Simple seasonal strength calculation
-        seasonal_vals = []
-        for i in range(period):
-            seasonal_vals.append(np.mean([ts[j] for j in range(i, len(ts), period)]))
 
-        seasonal_var = np.var(seasonal_vals)
-        total_var = np.var(ts)
-
-        return seasonal_var / total_var if total_var != 0 else 0
-    except:
-        return 0
-
-def extract_ts_features(df):
-    """Extract comprehensive time series features for clustering"""
-    features = []
-
-    for unique_id in df['unique_id'].unique():
-        ts_data = df.filter(pl.col('unique_id') == unique_id).sort('SALES_DATE')
-        values = ts_data['Act Orders Rev'].to_numpy()
-
-        if len(values) < 12:  # Skip if insufficient data
-            continue
-
-        # Basic statistics
-        mean_val = np.mean(values)
-        std_val = np.std(values)
-        cv = std_val / mean_val if mean_val != 0 else 0
-
-        # Trend analysis
-        x = np.arange(len(values))
-        trend_slope = np.polyfit(x, values, 1)[0] if len(values) > 1 else 0
-
-        # Seasonality strength (12-month seasonality)
-        if len(values) >= 24:
-            seasonal_strength = calculate_seasonal_strength(values, 12)
-        else:
-            seasonal_strength = 0
-
-        # Autocorrelation features
-        lag1_corr = pearsonr(values[:-1], values[1:])[0] if len(values) > 1 else 0
-        lag12_corr = pearsonr(values[:-12], values[12:])[0] if len(values) > 12 else 0
-
-        # Volatility
-        volatility = np.std(np.diff(values)) if len(values) > 1 else 0
-
-        # Zero proportion
-        zero_prop = np.sum(values == 0) / len(values)
-
-        # Growth characteristics
-        if len(values) >= 12:
-            recent_growth = np.mean(values[-6:]) / np.mean(values[:6]) if np.mean(values[:6]) != 0 else 1
-        else:
-            recent_growth = 1
-
-        features.append({
-            'unique_id': unique_id,
-            'mean': mean_val,
-            'std': std_val,
-            'cv': cv,
-            'trend_slope': trend_slope,
-            'seasonal_strength': seasonal_strength,
-            'lag1_corr': lag1_corr,
-            'lag12_corr': lag12_corr,
-            'volatility': volatility,
-            'zero_prop': zero_prop,
-            'recent_growth': recent_growth
-        })
-
-    return pl.DataFrame(features)
-
-def optimize_clusters(features_df, max_clusters=10):
-    """Find optimal number of clusters using silhouette score"""
-    feature_cols = [col for col in features_df.columns if col != 'unique_id']
-    X = features_df[feature_cols].to_numpy()
-
-    # Handle NaN and infinite values
-    X = np.nan_to_num(X, nan=0, posinf=0, neginf=0)
-
-    # Standardize features
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-
-    best_score = -1
-    best_k = 2
-
-    for k in range(2, min(max_clusters + 1, len(X) // 2)):
-        try:
-            kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-            labels = kmeans.fit_predict(X_scaled)
-
-            if len(np.unique(labels)) > 1:
-                score = silhouette_score(X_scaled, labels)
-                if score > best_score:
-                    best_score = score
-                    best_k = k
-        except:
-            continue
-
-    return best_k, best_score
-
-def create_enhanced_clusters(df: pl.DataFrame, state: DataState = None) -> pl.DataFrame:
-    """Enhanced clustering with proper feature engineering"""
-    if state is None:
-        state = get_global_state()
-
-    if 'unique_id' not in df.columns:
-        df = df.with_columns(unique_id = pl.col('country') + "," + pl.col('catalog_number'))
-    # Filter to training data with timezone-safe comparison
-    cutoff_date = datetime.today() - relativedelta(months=1)
-    df1 = df.filter(pl.col('sales_date').dt.date() <= cutoff_date.date())
-    # Extract time series features
-    features_df = extract_ts_features(df1)
-
-    if len(features_df) < 4:
-        print("Insufficient data for clustering")
-        return df
-    # Optimize cluster number
-    optimal_k, silhouette = optimize_clusters(features_df)
-    print(f"Optimal clusters: {optimal_k}, Silhouette score: {silhouette:.3f}")
-
-    # Perform clustering
-    feature_cols = [col for col in features_df.columns if col != 'unique_id']
-    X = features_df[feature_cols].to_numpy()
-    X = np.nan_to_num(X, nan=0, posinf=0, neginf=0)
-
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-
-    kmeans = KMeans(n_clusters=optimal_k, random_state=42, n_init=10)
-    features_df = features_df.with_columns(cluster=kmeans.fit_predict(X_scaled))
-    print(features_df)
-    # Join back to original data
-    df = df.drop(['cluster','cluster_right'], strict=False)
-    df = df.join(features_df[['unique_id', 'cluster']], on='unique_id', how='left')
-
-    # Save results
-    print(df)
-    df = df.with_columns(cluster=pl.col("cluster").forward_fill().backward_fill().over("unique_id"))
-    df = df.with_columns(cluster=pl.col('cluster').cast(pl.Utf8))
-
-    # Save clusters to database instead of parquet
-    db_service = get_database_service()
-    if db_service:
-        db_service.upsert_clusters(df)
-
-    # Update state
-    state.df = df
-
-    return df
-
-def tdays(dates: pd.DatetimeIndex) -> pd.Series:
-    """Calculate the number of days since the reference date (2022-01-01)."""
-    reference_date = pd.Timestamp('2022-01-01')
-    return pd.Series((dates - reference_date).days, index=dates, name='tdays')
-
-def prepare_data_for_mlforecast(df: pl.DataFrame) -> pl.DataFrame:
-    """Prepare data for MLForecast with required column names"""
-    # Make a copy to avoid modifying original
-    prepared_df = df.clone()
-
-    # Ensure we have the required columns with proper names
-    if 'SALES_DATE' in prepared_df.columns:
-        prepared_df = prepared_df.rename({'SALES_DATE': 'ds'})
-    if 'sales_date' in prepared_df.columns:
-        prepared_df = prepared_df.rename({'sales_date': 'ds'})
-    if 'Act Orders Rev' in prepared_df.columns:
-        prepared_df = prepared_df.rename({'Act Orders Rev': 'y'})
-    if 'act_orders_rev' in prepared_df.columns:
-        prepared_df = prepared_df.rename({'act_orders_rev': 'y'})
-
-    # Ensure 'ds' column is datetime
-    if 'ds' in prepared_df.columns:
-        prepared_df = prepared_df.with_columns(
-            pl.col('ds').cast(pl.Datetime).alias('ds')
-        )
-
-    # Ensure 'y' column is numeric
-    if 'y' in prepared_df.columns:
-        prepared_df = prepared_df.with_columns(
-            pl.col('y').cast(pl.Float64).alias('y')
-        )
-        # Remove null or infinite values
-        prepared_df = prepared_df.filter(
-            pl.col('y').is_not_null() &
-            pl.col('y').is_finite()
-        )
-
-    # Ensure we have unique_id
-    if 'unique_id' not in prepared_df.columns:
-        if 'item_skey' in prepared_df.columns and 'location_skey' in prepared_df.columns:
-            prepared_df = prepared_df.with_columns(
-                (pl.col('item_skey').cast(pl.Utf8) + "_" +
-                 pl.col('location_skey').cast(pl.Utf8)).alias('unique_id')
-            )
-        elif 'Country' in prepared_df.columns and 'CatalogNumber' in prepared_df.columns:
-            prepared_df = prepared_df.with_columns(
-                (pl.col('Country') + "," + pl.col('CatalogNumber')).alias('unique_id')
-            )
-        else:
-            prepared_df = prepared_df.with_columns(
-                unique_id=pl.lit("UNKNOWN")
-            )
-
-    return prepared_df
 
 
 def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFrame:
@@ -250,7 +32,7 @@ def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFram
 
     try:
         # Prepare data for MLForecast
-        prepared_df = prepare_data_for_mlforecast(df)
+        prepared_df = DataCleaner.prepare_data_for_mlforecast(df)
 
         if prepared_df.is_empty() or 'unique_id' not in prepared_df.columns or 'ds' not in prepared_df.columns or 'y' not in prepared_df.columns:
             print("Required columns missing for MLForecast")
@@ -337,59 +119,12 @@ def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFram
         forecasts_pl = service.run_forecasts(filtered_df, horizon=horizon)
 
         print("=" * 50)
-        print(f"=== Forecasting completed ===")
+        print("=== Forecasting completed ===")
 
         # Check if forecasts were generated
         if forecasts_pl.is_empty():
             print("No forecasts were generated")
             return pl.DataFrame()
-
-        # Rename forecast column to match expected format
-        # Apply the negative-to-zero logic here as well, after the model generates forecasts
-        if 'ensemble' in forecasts_pl.columns:
-            forecasts_pl = forecasts_pl.with_columns(
-                pl.when(pl.col('ensemble') < 0)
-                .then(0)
-                .otherwise(pl.col('ensemble'))
-                .alias('NHITS')
-            )
-            forecasts_pl = forecasts_pl.drop('ensemble')  # Remove the original column
-        elif 'rf' in forecasts_pl.columns:
-            forecasts_pl = forecasts_pl.with_columns(
-                pl.when(pl.col('rf') < 0)
-                .then(0)
-                .otherwise(pl.col('rf'))
-                .alias('NHITS')
-            )
-            forecasts_pl = forecasts_pl.drop('rf')  # Remove the original column
-        elif 'xgb' in forecasts_pl.columns:
-            forecasts_pl = forecasts_pl.with_columns(
-                pl.when(pl.col('xgb') < 0)
-                .then(0)
-                .otherwise(pl.col('xgb'))
-                .alias('NHITS')
-            )
-            forecasts_pl = forecasts_pl.drop('xgb')  # Remove the original column
-        elif 'NHITS' in forecasts_pl.columns:
-             # Just ensure non-negative
-             forecasts_pl = forecasts_pl.with_columns(
-                pl.when(pl.col('NHITS') < 0)
-                .then(0)
-                .otherwise(pl.col('NHITS'))
-                .alias('NHITS')
-            )
-        else:
-            # Use the first available forecast column and rename it to 'NHITS' after applying negative check
-            forecast_cols = [col for col in forecasts_pl.columns if col not in ['unique_id', 'ds', 'y']]
-            if forecast_cols:
-                col_name = forecast_cols[0]
-                forecasts_pl = forecasts_pl.with_columns(
-                    pl.when(pl.col(col_name) < 0)
-                    .then(0)
-                    .otherwise(pl.col(col_name))
-                    .alias('NHITS')
-                )
-                forecasts_pl = forecasts_pl.drop(col_name)  # Remove the original column
 
         # Ensure proper column names for database integration
         if 'ds' in forecasts_pl.columns:
@@ -432,10 +167,6 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_
             print(f"DEBUG: Forecast date range: {forecast_df['forecast_date'].min() if 'forecast_date' in forecast_df.columns else 'N/A'} to {forecast_df['forecast_date'].max() if 'forecast_date' in forecast_df.columns else 'N/A'}")
 
         if forecast_df is not None and not forecast_df.is_empty():
-            # Cast NHITS to Float32 to match other numeric columns
-            if 'NHITS' in forecast_df.columns:
-                forecast_df = forecast_df.with_columns(pl.col('NHITS').cast(pl.Float32))
-
             # Save forecasts to database if service is available
             db_service = get_database_service()
             saved_count = 0
@@ -474,21 +205,45 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_
                                 item_skeys.append(None)
                                 location_skeys.append(None)
 
-                            # Add columns to polars DataFrame
                             forecast_df = forecast_df.with_columns([
                                 pl.Series('item_skey', item_skeys).cast(pl.Int64),
                                 pl.Series('location_skey', location_skeys).cast(pl.Int64)
                             ])
 
-                        # Insert forecasts into database
-                        print(f"\n>>> Starting database insertion for {len(forecast_df)} forecast records...")
-                        print(f">>> DataFrame info: {forecast_df.shape} shape")
-                        import time
-                        db_start = time.time()
-                        saved_count = db_service.insert_forecasts(forecast_df, model_type="MLForecast", forecast_version=forecast_version)
-                        db_time = time.time() - db_start
-                        print(f">>> Database insertion completed in {db_time:.2f}s")
-                        print(f">>> Successfully saved {saved_count} forecast records to database")
+                        # Insert forecasts into database - one call per model
+                        # Determine which columns are model forecasts (exclude metadata columns)
+                        metadata_cols = ['unique_id', 'forecast_date', 'item_skey', 'location_skey']
+                        model_cols = [col for col in forecast_df.columns if col not in metadata_cols]
+                        
+                        print(f"\n>>> DEBUG: All columns in forecast_df: {forecast_df.columns}")
+                        print(f">>> DEBUG: Model columns detected: {model_cols}")
+                        print(f"\n>>> Found {len(model_cols)} models to save: {model_cols}")
+                        
+                        total_saved = 0
+                        for model_col in model_cols:
+                            # Create a DataFrame with just this model's forecasts
+                            model_forecast_df = forecast_df.select(metadata_cols + [model_col])
+                            
+                            try:
+                                print(f"\n>>> Inserting {len(model_forecast_df)} forecasts for model: {model_col}")
+                                import time
+                                db_start = time.time()
+                                saved = db_service.insert_forecasts(
+                                    model_forecast_df, 
+                                    model_type=model_col,  # Use the column name as model type
+                                    forecast_version=forecast_version,
+                                    forecast_value_col=model_col  # Tell it which column has the values
+                                )
+                                db_time = time.time() - db_start
+                                print(f">>> Model {model_col}: Saved {saved} records in {db_time:.2f}s")
+                                total_saved += saved
+                            except Exception as model_save_error:
+                                print(f"Error saving model {model_col}: {model_save_error}")
+                                import traceback
+                                traceback.print_exc()
+                        
+                        saved_count = total_saved
+                        print(f"\n>>> Total saved across all models: {saved_count} forecast records")
                 except Exception as save_error:
                     print(f"Error saving forecasts to database: {save_error}")
                     import traceback
@@ -497,19 +252,25 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_
             # Combine historical and forecast data for UI
             # 1. Prepare historical data
             hist_df = original_df.clone()
-            if 'NHITS' not in hist_df.columns:
-                hist_df = hist_df.with_columns(pl.lit(None, dtype=pl.Float32).alias('NHITS'))
+            
+            # Add NULL columns for all model types that might be in forecasts
+            model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'GARCH']
+            for model_col in model_cols:
+                if model_col not in hist_df.columns:
+                    hist_df = hist_df.with_columns(pl.lit(None, dtype=pl.Float32).alias(model_col))
 
             # 2. Prepare forecast data
             fcst_df = forecast_df.rename({'forecast_date': 'SALES_DATE'})
 
             # Ensure original_df has unique_id for joining dimensions
             if 'unique_id' not in original_df.columns:
-                original_df_with_id = prepare_data_for_mlforecast(original_df)
+                original_df_with_id = DataCleaner.prepare_data_for_mlforecast(original_df)
             else:
                 original_df_with_id = original_df
 
-            dim_cols = [c for c in original_df_with_id.columns if c not in ['SALES_DATE', 'Act Orders Rev', 'ds', 'y', 'NHITS']]
+            # Exclude model columns and metadata from dimension columns
+            exclude_cols = ['SALES_DATE', 'Act Orders Rev', 'ds', 'y'] + model_cols
+            dim_cols = [c for c in original_df_with_id.columns if c not in exclude_cols]
             if 'unique_id' not in dim_cols:
                 dim_cols.append('unique_id')
 
