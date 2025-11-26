@@ -814,7 +814,15 @@ async def handle_action(request: Request):
                 return HTMLResponse(content=html)
 
             # Run forecasting model (this saves results to the database)
-            core_data_service.create_models_action(filtered_df, session, forecast_version=filter_state.forecast_version)
+            core_data_service.create_models_action(
+                filtered_df, 
+                session, 
+                forecast_version=filter_state.forecast_version,
+                location_hierarchy=filter_state.location1,
+                location_value=filter_state.location2,
+                product_hierarchy=filter_state.product1,
+                product_value=filter_state.product2
+            )
 
             # Now, fetch the combined actuals and forecast data
             result_df = db_service.get_filtered_sales_actuals_with_forecasts(

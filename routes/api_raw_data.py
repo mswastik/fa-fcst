@@ -127,12 +127,26 @@ async def get_raw_data_pivot(request: Request):
         forecast_version = body.get('forecast_version')
         print(f"Received form pivot filter values: location1={location1}, location2={location2}, product1={product1}, product2={product2}")
 
+    db = get_database_service()
+
+    # If forecast_version is selected, ALWAYS get filter values from the database (override UI selections)
+    if forecast_version:
+        print(f"Fetching details for forecast version: {forecast_version}")
+        version_details = db.get_forecast_version_details(forecast_version, user_id="system")
+        if version_details:
+            # Override all filter values with those from the database
+            location1 = version_details.get('location1')
+            location2 = version_details.get('location2')
+            product1 = version_details.get('product1')
+            product2 = version_details.get('product2')
+            print(f"Using filters from version details: location1={location1}, location2={location2}, product1={product1}, product2={product2}")
+        else:
+            print(f"Warning: No details found for forecast version '{forecast_version}'")
+    
     # Check if all filters have values - if not, return empty data
     if not all([location1, location2, product1, product2]):
         print("Some filters are not present, returning empty data.")
         return JSONResponse(content={"data": []})
-
-    db = get_database_service()
 
     # Use the new combined method to get both sales actuals and forecasts
     data = db.get_filtered_sales_actuals_with_forecasts(

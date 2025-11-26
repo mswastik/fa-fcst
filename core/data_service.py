@@ -139,13 +139,19 @@ def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFram
         return pl.DataFrame()
 
 
-def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_version: Optional[str] = None) -> Tuple[Optional[pl.DataFrame], Dict[str, Any]]:
+def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_version: Optional[str] = None,
+                            location_hierarchy: Optional[str] = None, location_value: Optional[str] = None,
+                            product_hierarchy: Optional[str] = None, product_value: Optional[str] = None) -> Tuple[Optional[pl.DataFrame], Dict[str, Any]]:
     """Run the forecasting pipeline using MLForecast and save results to database
 
     Args:
         df: Polars DataFrame with sales data
         state: Optional DataState instance
         forecast_version: Optional string to identify the forecast version
+        location_hierarchy: Optional location hierarchy name (e.g., "Region")
+        location_value: Optional location value (e.g., "ASEAN")
+        product_hierarchy: Optional product hierarchy name (e.g., "Franchise")
+        product_value: Optional product value (e.g., "Surgical")
 
     Returns:
         Tuple of (combined_df, validation_results_dict)
@@ -232,7 +238,11 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_
                                     model_forecast_df,
                                     model_type=model_col,  # Use the column name as model type
                                     forecast_version=forecast_version,
-                                    forecast_value_col=model_col  # Tell it which column has the values
+                                    forecast_value_col=model_col,  # Tell it which column has the values
+                                    location_hierarchy=location_hierarchy,
+                                    location_value=location_value,
+                                    product_hierarchy=product_hierarchy,
+                                    product_value=product_value
                                 )
                                 db_time = time.time() - db_start
                                 print(f">>> Model {model_col}: Saved {saved} records in {db_time:.2f}s")
@@ -317,7 +327,9 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_
         return df, {'error': str(e), 'forecasts_generated': 0, 'forecasts_saved': 0}
 
 
-def create_models_action(df: pl.DataFrame, state: DataState = None, forecast_version: Optional[str] = None) -> pl.DataFrame:
+def create_models_action(df: pl.DataFrame, state: DataState = None, forecast_version: Optional[str] = None,
+                           location_hierarchy: Optional[str] = None, location_value: Optional[str] = None,
+                           product_hierarchy: Optional[str] = None, product_value: Optional[str] = None) -> pl.DataFrame:
     """Business logic for creating forecasting models using MLForecast"""
     if state is None:
         state = get_global_state()
@@ -329,7 +341,15 @@ def create_models_action(df: pl.DataFrame, state: DataState = None, forecast_ver
         print(f"Generated forecast version: {forecast_version}")
 
         # Run the MLForecast pipeline
-        result_df, validation_results = run_mlforecast_pipeline(df, state, forecast_version=forecast_version)
+        result_df, validation_results = run_mlforecast_pipeline(
+            df, 
+            state, 
+            forecast_version=forecast_version,
+            location_hierarchy=location_hierarchy,
+            location_value=location_value,
+            product_hierarchy=product_hierarchy,
+            product_value=product_value
+        )
 
         # Ensure original column structure is preserved for UI compatibility
         if result_df is not None and not result_df.is_empty():

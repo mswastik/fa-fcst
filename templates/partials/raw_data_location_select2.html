@@ -1,35 +1,30 @@
 <label class="block text-sm font-medium text-gray-700" id="location2-label">{{ label }}</label>
-<select
-    name="location2"
+<select name="location2"
     class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
     hx-post="/api/raw_data/pivot"
     hx-include="[name='location1'], [name='location2'], [name='product1'], [name='product2']"
-    hx-indicator=".htmx-indicator"
-    hx-trigger="change"
-    hx-target="body"
-    hx-swap="none"
-    hx-on:htmx:after-request="initializePivotInterface(event.detail.xhr.response)"
->
-    <!-- <option value="">Select {{ label|lower }}...</option> -->
+    hx-indicator=".htmx-indicator" hx-trigger="change" hx-target="body" hx-swap="none"
+    hx-on:htmx:after-request="initializePivotInterface(event.detail.xhr.response)">
+    <option value="">Select {{ label|lower }}...</option>
     {% for option in options %}
     <option value="{{ option }}">{{ option }}</option>
     {% endfor %}
 </select>
 <script>
-// Initialize TomSelect after the select element is inserted into the DOM
-setTimeout(() => {
-    if (typeof TomSelect !== 'undefined') {
-        const selectElement = document.querySelector('[name="location2"].tom-select:not(.tom-selected)');
-        if (selectElement && !selectElement.tomselect) {
-            const tomSelectInstance = new TomSelect(selectElement, {
-                create: false,
-                maxItems: 1,
-                allowEmptyOption: true,
-                closeAfterSelect: true,
-                placeholder: 'Search or select...'
-            });
-            selectElement.classList.add('tom-selected');
+    // Initialize TomSelect after the select element is inserted into the DOM
+    setTimeout(() => {
+        if (typeof TomSelect !== 'undefined') {
+            const selectElement = document.querySelector('[name="location2"].tom-select:not(.tom-selected)');
+            if (selectElement && !selectElement.tomselect) {
+                const tomSelectInstance = new TomSelect(selectElement, {
+                    create: false,
+                    maxItems: 1,
+                    allowEmptyOption: true,
+                    closeAfterSelect: true,
+                    placeholder: 'Search or select...'
+                });
+                selectElement.classList.add('tom-selected');
+            }
         }
-    }
-}, 100);
+    }, 100);
 </script>

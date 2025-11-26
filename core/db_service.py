@@ -611,7 +611,10 @@ class DatabaseService:
             except:
                 return []
 
-    def insert_forecasts(self, forecast_df: pl.DataFrame, model_type: str, forecast_version: Optional[str] = None, user_id: str = None, forecast_value_col: Optional[str] = None) -> int:
+    def insert_forecasts(self, forecast_df: pl.DataFrame, model_type: str, forecast_version: Optional[str] = None, 
+                         user_id: str = None, forecast_value_col: Optional[str] = None,
+                         location_hierarchy: Optional[str] = None, location_value: Optional[str] = None,
+                         product_hierarchy: Optional[str] = None, product_value: Optional[str] = None) -> int:
         """
         Inserts forecast data into the da.forecasts table.
         Assumes forecast_df has 'unique_id', 'forecast_date' (or 'ds' or 'SALES_DATE'), and forecast columns (e.g., 'Fcst Ensemble Rev').
@@ -624,6 +627,10 @@ class DatabaseService:
             forecast_version: Version string for this forecast run
             user_id: User ID
             forecast_value_col: Name of the column containing forecast values (if None, will auto-detect)
+            location_hierarchy: Name of the location hierarchy level (e.g., "Region")
+            location_value: Value of the location filter (e.g., "ASEAN")
+            product_hierarchy: Name of the product hierarchy level (e.g., "Franchise")
+            product_value: Value of the product filter (e.g., "Surgical")
         """
         if not user_id:
             user_id = "system" # Default to system user if not provided
@@ -708,7 +715,14 @@ class DatabaseService:
         current_model_version = forecast_version if forecast_version is not None else "1.0"
 
         # Create or get version_id for this forecast run
-        version_id = self._create_or_get_version_id(current_model_version, user_id=user_id)
+        version_id = self._create_or_get_version_id(
+            current_model_version, 
+            user_id=user_id,
+            location_hierarchy=location_hierarchy,
+            location_value=location_value,
+            product_hierarchy=product_hierarchy,
+            product_value=product_value
+        )
 
         if use_direct_skeys:
             # Process all records at once when skeys are available directly
@@ -950,6 +964,8 @@ class DatabaseService:
                                   product_value: Optional[str] = None):
         """Create a new version record or get an existing one based on version name and other details."""
         conn = duckdb.connect(self.connection_manager._db_path)
+        from datetime import datetime
+        import uuid
         try:
             # Check if a version with this name already exists
             check_query = """
@@ -961,11 +977,25 @@ class DatabaseService:
             result = conn.execute(check_query, params).fetchone()
 
             if result:
-                return result[0]  # Return existing version_id
+                version_id = result[0]
+                # Always update existing version with new details to ensure they're saved when regenerating
+                update_query = """
+                UPDATE da.forecast_versions
+                SET location_hierarchy = ?, location_value = ?,
+                    product_hierarchy = ?, product_value = ?,
+                    created_at = ?
+                WHERE version_id = ?
+                """
+                update_params = [
+                    location_hierarchy, location_value,
+                    product_hierarchy, product_value,
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    version_id
+                ]
+                conn.execute(update_query, update_params)
+                return version_id
             else:
                 # Create a new version record
-                import uuid
-                from datetime import datetime
                 version_id = uuid.uuid4().int & (1<<63)-1  # Generate a 63-bit integer UUID
 
                 insert_query = """
@@ -992,6 +1022,32 @@ class DatabaseService:
             raise
         finally:
             conn.close()
+
+    def get_forecast_version_details(self, version_name: str, user_id: Optional[str] = None) -> Dict[str, str]:
+        """Get details (filters) for a specific forecast version."""
+        if not user_id:
+            user_id = "system"
+
+        query = """
+        SELECT location_hierarchy, location_value, product_hierarchy, product_value
+        FROM da.forecast_versions
+        WHERE version_name = ?
+        """
+
+        try:
+            result_df = self.execute_query(query, (version_name,), user_id=user_id)
+            if result_df is not None and not result_df.is_empty():
+                row = result_df.row(0)
+                return {
+                    'location1': row[0],
+                    'location2': row[1],
+                    'product1': row[2],
+                    'product2': row[3]
+                }
+            return {}
+        except Exception as e:
+            logger.error(f"Error getting forecast version details: {e}")
+            return {}
 
     def get_forecast_versions(self, user_id: Optional[str] = None) -> List[str]:
         """Get all distinct forecast versions from the forecast_versions table."""
@@ -1078,15 +1134,39 @@ class DatabaseService:
         where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
 
         # This CTE identifies the skeys for the filtered products/locations
-        skeys_cte = f"""
-        WITH FilteredSkeys AS (
-            SELECT DISTINCT sa.item_skey, sa.location_skey
-            FROM da.sales_actuals sa
-            INNER JOIN da.product_hierarchy ph ON sa.item_skey = ph.demantra_item_skey
-            INNER JOIN da.location_hierarchy lh ON sa.location_skey = lh.location_skey
-            WHERE {where_clause}
-        )
-        """
+        # When a forecast_version is specified, also include skeys from forecasts
+        if forecast_version and forecast_version != 'All':
+            skeys_cte = f"""
+            WITH FilteredSkeys AS (
+                SELECT DISTINCT sa.item_skey, sa.location_skey
+                FROM da.sales_actuals sa
+                INNER JOIN da.product_hierarchy ph ON sa.item_skey = ph.demantra_item_skey
+                INNER JOIN da.location_hierarchy lh ON sa.location_skey = lh.location_skey
+                WHERE {where_clause}
+                
+                UNION
+                
+                SELECT DISTINCT f.item_skey, f.location_skey
+                FROM da.forecasts f
+                INNER JOIN da.forecast_versions fv ON f.version_id = fv.version_id
+                INNER JOIN da.product_hierarchy ph ON f.item_skey = ph.demantra_item_skey
+                INNER JOIN da.location_hierarchy lh ON f.location_skey = lh.location_skey
+                WHERE fv.version_name = ? AND {where_clause}
+            )
+            """
+            # Build full params list: first set for actuals query, forecast_version, second set for forecasts UNION
+            full_params = params + [forecast_version] + params
+        else:
+            skeys_cte = f"""
+            WITH FilteredSkeys AS (
+                SELECT DISTINCT sa.item_skey, sa.location_skey
+                FROM da.sales_actuals sa
+                INNER JOIN da.product_hierarchy ph ON sa.item_skey = ph.demantra_item_skey
+                INNER JOIN da.location_hierarchy lh ON sa.location_skey = lh.location_skey
+                WHERE {where_clause}
+            )
+            """
+            full_params = params
 
         # Query for Actuals
         actuals_query = """
@@ -1160,7 +1240,7 @@ class DatabaseService:
         ORDER BY "SALES_DATE"
         """
 
-        return self.execute_query(full_query, tuple(params), user_id)
+        return self.execute_query(full_query, tuple(full_params), user_id)
 
     def close_user_session(self, user_id: str):
         """Close the database session for a specific user"""
