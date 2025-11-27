@@ -301,7 +301,8 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
             'AutoARIMA': {'border': 'rgb(133, 69, 138)', 'bg': 'rgba(133, 69, 138, 0.2)'}, # purple
             'MSTL': {'border': 'rgb(76, 125, 122)', 'bg': 'rgba(76, 125, 122, 0.2)'},      # teal
             'AutoCES': {'border': 'rgb(175, 109, 4)', 'bg': 'rgba(175, 109, 4, 0.2)'},      # orange
-            'AutoMFLES': {'border': 'rgb(178, 180, 174)', 'bg': 'rgba(178, 180, 174, 0.2)'} # gray
+            'AutoMFLES': {'border': 'rgb(178, 180, 174)', 'bg': 'rgba(178, 180, 174, 0.2)'}, # gray
+            'AutoTBATS': {'border': 'rgb(233, 30, 99)', 'bg': 'rgba(233, 30, 99, 0.2)'}      # pink
         }
 
         for model_name, model_values in forecast_series.items():
@@ -742,7 +743,7 @@ def generate_table_html(df: pl.DataFrame, filter_state) -> str:
         )
 
         # For forecasts, find all model columns dynamically
-        model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'AutoCES', 'AutoMFLES']
+        model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'AutoCES', 'AutoMFLES', 'AutoTBATS']
         available_models = [col for col in model_cols if col in df.columns]
 
         forecast_dfs = []

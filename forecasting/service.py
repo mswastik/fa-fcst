@@ -9,7 +9,7 @@ from mlforecast.lag_transforms import RollingMean
 from sklearn.ensemble import VotingRegressor
 import xgboost as xgb
 from statsforecast.core import StatsForecast
-from statsforecast.models import AutoARIMA, MSTL, AutoCES, AutoMFLES
+from statsforecast.models import AutoARIMA, MSTL, AutoCES, AutoMFLES, AutoTBATS
 import warnings
 from dateutil.relativedelta import relativedelta
 
@@ -105,12 +105,13 @@ class ForecastingService:
             'xgb': VotingRegressor([('xgb1', xgb1), ('xgb2', xgb2)])
         }
 
-        # Define StatsForecast models
         sf_models = [
-            AutoARIMA(season_length=12),
+            # AutoARIMA: stepwise=False and approximation=False are CRITICAL for avoiding flat forecasts on seasonal data
+            AutoARIMA(season_length=12, approximation=True, stepwise=True),
             MSTL(season_length=[12]),
             AutoCES(season_length=12),
-            AutoMFLES(season_length=12,test_size = 12)
+            AutoMFLES(season_length=12, test_size=12),
+            AutoTBATS(season_length=12)
         ]
 
         results = []
@@ -150,6 +151,10 @@ class ForecastingService:
                 sf_res_pl = pl.from_pandas(sf_res)
 
                 # Rename 'ds' to match if needed (StatsForecast returns 'ds')
+                # Rename 'CES' to 'AutoCES' if present
+                if 'CES' in sf_res_pl.columns:
+                    sf_res_pl = sf_res_pl.rename({'CES': 'AutoCES'})
+
                 # Ensure unique_id is present
                 if 'unique_id' not in sf_res_pl.columns:
                     sf_res_pl = sf_res_pl.with_columns(pl.lit(uid_str).alias('unique_id'))

@@ -259,7 +259,7 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_
             hist_df = original_df.clone()
 
             # Add NULL columns for all model types that might be in forecasts
-            model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'AutoCES', 'AutoMFLES']
+            model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'AutoCES', 'AutoMFLES', 'AutoTBATS']
             for model_col in model_cols:
                 if model_col not in hist_df.columns:
                     hist_df = hist_df.with_columns(pl.lit(None, dtype=pl.Float32).alias(model_col))

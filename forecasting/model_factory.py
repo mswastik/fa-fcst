@@ -8,7 +8,7 @@ from neuralforecast import NeuralForecast
 from neuralforecast.models import NHITS, LSTM
 from neuralforecast.losses.pytorch import RMSE
 from statsforecast import StatsForecast
-from statsforecast.models import AutoARIMA, AutoETS, SeasonalNaive
+from statsforecast.models import AutoARIMA, AutoETS, SeasonalNaive, AutoTBATS
 
 
 class ModelConfiguration:
@@ -85,9 +85,10 @@ class StatisticalModelFactory:
     def create_statistical_models(season_length: int = 12) -> List:
         """Create statistical forecasting models."""
         return [
-            AutoARIMA(season_length=season_length),
+            AutoARIMA(season_length=season_length, approximation=False, stepwise=False),
             AutoETS(season_length=season_length),
-            SeasonalNaive(season_length=season_length)
+            SeasonalNaive(season_length=season_length),
+            AutoTBATS(season_length=season_length)
         ]
 
 

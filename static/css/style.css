@@ -69,7 +69,9 @@ button.danger {
     background: linear-gradient(135deg, var(--brand-purple) 0%, var(--brand-orange) 100%);
 }
 
-input, select, textarea {
+input,
+select,
+textarea {
     border: 1px solid #ced4da;
     border-color: var(--brand-gray);
     border-radius: 6px;
@@ -78,7 +80,9 @@ input, select, textarea {
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-input:focus, select:focus, textarea:focus {
+input:focus,
+select:focus,
+textarea:focus {
     outline: none;
     border-color: var(--brand-blue);
     box-shadow: 0 0 0 3px rgba(var(--brand-blue-rgb), 0.25);
@@ -116,14 +120,14 @@ input:focus, select:focus, textarea:focus {
 
 .container {
     min-width: 99dvw;
-    min-height: 90vh;
+    min-height: 92vh;
     margin: 0 auto;
     background: rgba(255, 255, 255, 0.95);
     border-radius: 0px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
     backdrop-filter: blur(10px);
     overflow: hidden;
-    padding:2px;
+    padding: 2px;
 }
 
 .header {
@@ -230,7 +234,8 @@ input:focus, select:focus, textarea:focus {
     background-color: #fff;
 }
 
-.field-group h3, h4 {
+.field-group h3,
+h4 {
     color: #495057;
     font-size: 1.2rem;
     text-transform: uppercase;
@@ -351,8 +356,9 @@ input:focus, select:focus, textarea:focus {
     flex-wrap: wrap;
     align-items: center;
 }
+
 #reset-catalog-filter:hover {
- color: #dc3545;
+    color: #dc3545;
 }
 
 .btn {
@@ -368,7 +374,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .btn:hover {
-    transform: translateY(-2px);
+    /*transform: translateY(-1px);*/
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
@@ -508,6 +514,7 @@ input:focus, select:focus, textarea:focus {
     font-size: 0.8rem;
     color: black;
 }
+
 .aggregation-select:focus {
     background-position-x: 120%;
     background-position-y: 2px;
@@ -517,12 +524,14 @@ input:focus, select:focus, textarea:focus {
     transform: none;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
+
 .grid-view {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 10px;
     width: 66vw;
 }
+
 .flex-view {
     display: flex;
     gap: 20px;
@@ -582,8 +591,13 @@ input:focus, select:focus, textarea:focus {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 .custom-multiselect {
@@ -724,6 +738,7 @@ select {
     border: 1px solid var(--brand-gray);
     border-radius: 2px;
 }
+
 select:focus-within {
     border-color: var(--brand-blue);
     outline: none;
@@ -733,57 +748,76 @@ select:focus-within {
     background-position-x: 100%;
     background-position-y: 7px;
 }
+
 .catalog-number-table {
-    width: 200px; /* Adjust width as needed */
-    margin-right: 0px; /* Space between table and content */
+    width: 200px;
+    /* Adjust width as needed */
+    margin-right: 0px;
+    /* Space between table and content */
     border: 1px solid var(--brand-gray);
     border-radius: 4px;
     padding: 5px;
-    overflow-y: auto; /* Add scroll if list is long */
-    max-height: 80dvh; /* Adjust max height as needed */
+    overflow-y: auto;
+    /* Add scroll if list is long */
+    max-height: 80dvh;
+    /* Adjust max height as needed */
 }
+
 .catalog-number-table h4 {
     margin-top: 0;
     margin-bottom: 10px;
     text-align: center;
 }
+
 #catalog-number-list {
     font-size: 0.9em;
 }
+
 #catalog-number-list div {
     padding: 5px;
     cursor: pointer;
     border-bottom: 1px solid var(--brand-gray);
 }
+
 #catalog-number-list div:hover {
     background-color: rgba(var(--brand-gray-rgb), 0.1);
 }
+
 #catalog-number-list div.selected {
     background-color: rgba(var(--brand-blue-rgb), 0.2);
     font-weight: bold;
 }
+
 .collapsed {
     width: 50px;
     overflow: hidden;
     border: 1px solid var(--brand-gray);
 }
-#sidebar-left, #sidebar-right {
+
+#sidebar-left,
+#sidebar-right {
     transition: width 0.3s ease;
     min-width: 50px;
 }
 
 
 .ts-control {
-    border: 1px solid var(--brand-gray); /* Match general input border */
-    border-radius: 6px; /* Match general input border-radius */
-    padding: 8px 12px; /* Match general input padding */
-    font-size: 0.9rem; /* Match general input font-size */
-    min-height: 38px; /* Approximate height based on padding and font-size */
+    border: 1px solid var(--brand-gray);
+    /* Match general input border */
+    border-radius: 6px;
+    /* Match general input border-radius */
+    padding: 8px 12px;
+    /* Match general input padding */
+    font-size: 0.9rem;
+    /* Match general input font-size */
+    min-height: 38px;
+    /* Approximate height based on padding and font-size */
     line-height: 1.2;
     display: flex;
     align-items: center;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
-    box-shadow: none !important; /* Explicitly remove default shadows */
+    box-shadow: none !important;
+    /* Explicitly remove default shadows */
 }
 
 .ts-control:focus-within {
@@ -793,30 +827,38 @@ select:focus-within {
 }
 
 .ts-dropdown {
-    border: 1px solid var(--brand-gray); /* Match general input border */
-    border-radius: 6px; /* Match general input border-radius */
+    border: 1px solid var(--brand-gray);
+    /* Match general input border */
+    border-radius: 6px;
+    /* Match general input border-radius */
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .ts-dropdown .active {
-    background-color: rgba(var(--brand-blue-rgb), 0.1); /* Light blue for active state */
+    background-color: rgba(var(--brand-blue-rgb), 0.1);
+    /* Light blue for active state */
 }
 
 .ts-dropdown .option {
-    padding: 8px 12px; /* Match general input padding */
+    padding: 8px 12px;
+    /* Match general input padding */
 }
 
 /* TomSelect customization to match regular select styling */
 .ts-wrapper.form-select {
-    min-height: 38px; /* Match calculated min-height of ts-control */
+    min-height: 38px;
+    /* Match calculated min-height of ts-control */
     display: flex;
     align-items: center;
-    border: none; /* Border is handled by ts-control */
-    box-shadow: none !important; /* Explicitly remove default shadows from wrapper */
+    border: none;
+    /* Border is handled by ts-control */
+    box-shadow: none !important;
+    /* Explicitly remove default shadows from wrapper */
 }
 
 /* Ensure consistent height for TomSelect elements */
 .ts-wrapper.form-select .ts-control {
     min-height: 38px;
-    height: auto; /* Allow height to adjust based on content if needed */
+    height: auto;
+    /* Allow height to adjust based on content if needed */
 }

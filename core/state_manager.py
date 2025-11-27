@@ -316,7 +316,7 @@ class DataState:
         agg_actuals = chart_data.group_by(['Year', 'Month']).sum()['Year', 'Month', 'Act Orders Rev']
 
         # Group by Year and Month for forecasts - sum all model columns
-        model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'AutoCES', 'AutoMFLES']
+        model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'AutoCES', 'AutoMFLES', 'AutoTBATS']
         available_models = [col for col in model_cols if col in chart_data.columns]
 
         agg_forecasts = None
@@ -429,7 +429,7 @@ class DataState:
         agg_data = chart_data.group_by('group').sum()['group', 'Act Orders Rev']
 
         # Process all available model forecasts separately
-        model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'AutoCES', 'AutoMFLES']
+        model_cols = ['xgb', 'AutoARIMA', 'MSTL', 'AutoCES', 'AutoMFLES', 'AutoTBATS']
         available_models = [col for col in model_cols if col in chart_data.columns]
 
         forecast_series = {}
