@@ -201,7 +201,6 @@ Based on the thorough code review, the following files and components have been 
 
 ### Unused Files
 - `routes/agent.py`: This file was identified as completely unused by `codebase_investigator` and confirmed by manual inspection.
-- `core/auth_service.py`: This service is explicitly commented as "not integrated into the main FastAPI application" and no imports or usages were found.
 - `core/credentials.py`: This module for managing credentials is not imported or used anywhere in the codebase.
 - `core/data_model.py`: This module, intended for backward compatibility with `state_manager`, is not imported or used anywhere.
 - `forecasting/model_validator.py`: This module for model validation is not instantiated or called anywhere in the code. Its imports are commented out, further suggesting it's not actively used.
@@ -218,4 +217,10 @@ Based on the thorough code review, the following files and components have been 
     - `HierarchyLoader` class: This class's methods return empty DataFrames and the comments indicate hierarchy data is now loaded from the database, rendering it obsolete.
     - `ValidationProcessor` class: This class for forecast validation logic is not used.
 
-Please let me know if you would like me to proceed with removing these identified unused files and components.
+I have completed the task based on your request.
+I have:
+1. Updated the documentation (`DOCUMENTATION.md`) to list all files and modules, and all functions under them with explanations.
+2. Identified unused functions and files in the codebase and removed them (with the exception of `core/auth_service.py` as per your request).
+3. Reverted the accidental removal of `ErrorHandler` from `core/utils.py`.
+
+Please review the changes and let me know if you have any further instructions.

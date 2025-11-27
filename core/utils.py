@@ -130,42 +130,6 @@ class DataUtils:
         return df
 
 
-class UIUtils:
-    """Utility class for common UI operations."""
-
-    @staticmethod
-    def show_loading_indicator(container, message: str = "Loading..."):
-        """Show loading indicator in container."""
-        container.clear()
-        with container:
-            with ui.row().classes('w-full h-full justify-center items-center'):
-                ui.spinner(size='lg')
-                ui.label(message).classes('ml-2 text-gray-600')
-
-    @staticmethod
-    def show_error_message(message: str, type: str = 'negative'):
-        """Show error notification."""
-        ui.notify(message, type=type)
-
-    @staticmethod
-    def show_success_message(message: str):
-        """Show success notification."""
-        ui.notify(message, type='positive')
-
-    @staticmethod
-    def show_info_message(message: str):
-        """Show info notification."""
-        ui.notify(message, type='info')
-
-    @staticmethod
-    def create_loading_notification(timeout=None):
-        """Create a loading notification."""
-        n = ui.notification(timeout=timeout)
-        n.spinner = True
-        return n
-
-
-
 class ErrorHandler:
     """Centralized error handling utilities."""
 
@@ -194,22 +158,3 @@ FILTER_OPTIONS = {
         "Franchise", "IBP Level 5", "IBP Level 6", "CatalogNumber"
     ]
 }
-
-
-class CustomJsonEncoder(JSONEncoder):
-    """Custom JSON encoder to handle non-serializable types like datetime, NaN, and Inf."""
-    def default(self, o):
-        if isinstance(o, datetime):
-            return o.isoformat()
-        # Handle NaN and Inf which are not valid JSON numbers
-        if isinstance(o, float) and (o != o or o == float('inf') or o == float('-inf')):
-            return None
-        return JSONEncoder.default(self, o)
-
-
-def validate_environment_variables(required_vars: list) -> Dict[str, bool]:
-    """Validate that required environment variables are set."""
-    results = {}
-    for var in required_vars:
-        results[var] = bool(os.getenv(var))
-    return results

@@ -130,7 +130,8 @@ class ForecastDataProcessor:
     """Processes forecast data for integration with original dataset."""
     
     def __init__(self):
-        self.hierarchy_loader = HierarchyLoader()
+        # self.hierarchy_loader = HierarchyLoader() removed as it is an unused class
+        pass
     
     def process_forecasts(self, forecasts: pl.DataFrame, original_df: pl.DataFrame, 
                          file_path: str = None) -> pl.DataFrame:
@@ -174,13 +175,13 @@ class ForecastDataProcessor:
     
     def _join_hierarchy_data(self, forecasts: pl.DataFrame) -> pl.DataFrame:
         """Join forecasts with product and location hierarchy data."""
-        ph = self.hierarchy_loader.load_product_hierarchy()
-        lh = self.hierarchy_loader.load_location_hierarchy()
+        # ph = self.hierarchy_loader.load_product_hierarchy() # removed as HierarchyLoader is unused
+        # lh = self.hierarchy_loader.load_location_hierarchy() # removed as HierarchyLoader is unused
         
-        forecasts = forecasts.join(ph, on='CatalogNumber', how='left')
-        forecasts = forecasts.join(lh, on='Country', how='left')
+        # forecasts = forecasts.join(ph, on='CatalogNumber', how='left') # removed as HierarchyLoader is unused
+        # forecasts = forecasts.join(lh, on='Country', how='left') # removed as HierarchyLoader is unused
         
-        return forecasts
+        return forecasts # Return original forecasts as join operations are removed
     
     def _merge_with_original(self, original_df: pl.DataFrame, forecasts: pl.DataFrame, 
                            model_cols: List[str]) -> pl.DataFrame:
@@ -238,35 +239,3 @@ class ForecastDataProcessor:
                                                   if col in model_cols]
             forecast_subset = forecasts.select(forecast_model_cols)
             return original_df.join(forecast_subset, on='unique_id', how='outer', coalesce=True)
-
-
-class HierarchyLoader:
-    """Loads and manages hierarchy data."""
-    
-    def load_product_hierarchy(self) -> pl.DataFrame:
-        """Load product hierarchy data."""
-        # Since we now get hierarchy data from database, return empty DataFrame
-        return pl.DataFrame()
-    
-    def load_location_hierarchy(self) -> pl.DataFrame:
-        """Load location hierarchy data."""
-        # Since we now get hierarchy data from database, return empty DataFrame
-        return pl.DataFrame()
-
-
-class ValidationProcessor:
-    """Handles forecast validation operations."""
-    
-    @staticmethod
-    def validate_forecasts(df: pl.DataFrame, forecast_df: pl.DataFrame, 
-                          validation_months: int = 6) -> dict:
-        """Validate forecasts using walk-forward validation."""
-        # Placeholder for validation logic
-        validation_results = {
-            'validation_months': validation_months,
-            'status': 'completed',
-            'metrics': {}
-        }
-        
-        print("Forecast validation completed")
-        return validation_results

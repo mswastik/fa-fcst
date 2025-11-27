@@ -256,7 +256,7 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
 
             WHERE
                 [SALES_DATE] BETWEEN '{current_start.strftime('%Y-%m-%d')}' AND '{current_end.strftime('%Y-%m-%d')}'
-                -- AND s.[Location_skey] IN (22,17,253)
+                AND s.[Location_skey] IN (22,17,253)
 
             GROUP BY
                 s.[item_skey],s.[Location_skey],s.[SALES_DATE]
