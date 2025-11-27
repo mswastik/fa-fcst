@@ -297,11 +297,11 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
         # Build datasets for all forecast models
         forecast_datasets = []
         model_colors = {
-            'xgb': {'border': 'rgb(255, 99, 132)', 'bg': 'rgba(255, 99, 132, 0.2)'},  # red
-            'AutoARIMA': {'border': 'rgb(54, 162, 235)', 'bg': 'rgba(54, 162, 235, 0.2)'},  # blue
-            'MSTL': {'border': 'rgb(255, 206, 86)', 'bg': 'rgba(255, 206, 86, 0.2)'},  # yellow
-            'AutoCES': {'border': 'rgb(75, 192, 192)', 'bg': 'rgba(75, 192, 192, 0.2)'},  # teal
-            'AutoMFLES': {'border': 'rgb(153, 102, 255)', 'bg': 'rgba(153, 102, 255, 0.2)'}  # purple
+            'xgb': {'border': 'rgb(255, 181, 0)', 'bg': 'rgba(255, 181, 0, 0.2)'},      # gold
+            'AutoARIMA': {'border': 'rgb(133, 69, 138)', 'bg': 'rgba(133, 69, 138, 0.2)'}, # purple
+            'MSTL': {'border': 'rgb(76, 125, 122)', 'bg': 'rgba(76, 125, 122, 0.2)'},      # teal
+            'AutoCES': {'border': 'rgb(175, 109, 4)', 'bg': 'rgba(175, 109, 4, 0.2)'},      # orange
+            'AutoMFLES': {'border': 'rgb(178, 180, 174)', 'bg': 'rgba(178, 180, 174, 0.2)'} # gray
         }
 
         for model_name, model_values in forecast_series.items():
@@ -369,10 +369,16 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                             }},
                             scales: {{
                                 y: {{
-                                    beginAtZero: false
+                                    beginAtZero: false,
+                                    grid: {{
+                                        color: 'rgba(178, 180, 174, 0.2)'
+                                    }}
                                 }},
                                 x: {{
                                     display: true,
+                                    grid: {{
+                                        color: 'rgba(178, 180, 174, 0.2)'
+                                    }},
                                     title: {{
                                         display: true,
                                         text: 'Time'
@@ -431,14 +437,14 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
             # Assign different colors based on position in series
             color_index = i % 3  # Cycle through 3 main colors
             if color_index == 0:
-                bg_color = 'rgba(28, 86, 135, 0.2)'  # blue with transparency
-                border_color = 'rgb(28, 86, 135)'  # blue
+                bg_color = 'rgba(28, 86, 135, 0.5)'   # blue with transparency
+                border_color = 'rgb(28, 86, 135)'   # blue
             elif color_index == 1:
-                bg_color = 'rgba(255, 181, 0, 0.2)'  # gold with transparency
-                border_color = 'rgb(255, 181, 0)'  # gold
+                bg_color = 'rgba(255, 181, 0, 0.5)'  # gold with transparency
+                border_color = 'rgb(255, 181, 0)'   # gold
             else:
-                bg_color = 'rgba(175, 109, 4, 0.2)'  # orange with transparency
-                border_color = 'rgb(175, 109, 4)'  # orange
+                bg_color = 'rgba(175, 109, 4, 0.5)'   # orange with transparency
+                border_color = 'rgb(175, 109, 4)'   # orange
 
             datasets.append({
                 'label': s.get('name', ''),
@@ -485,10 +491,138 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                             }},
                             scales: {{
                                 y: {{
-                                    beginAtZero: true
+                                    beginAtZero: false,
+                                    grid: {{
+                                        color: 'rgba(178, 180, 174, 0.2)'
+                                    }}
                                 }},
                                 x: {{
                                     display: true,
+                                    grid: {{
+                                        color: 'rgba(178, 180, 174, 0.2)'
+                                    }},
+                                    title: {{
+                                        display: true,
+                                        text: 'Time'
+                                    }},
+                                    ticks: {{
+                                        callback: function(value, index, values) {{
+                                            // Convert datetime to abbreviated month-year format
+                                            if (this.getLabelForValue(value)) {{
+                                                const date = new Date(this.getLabelForValue(value));
+                                                if (!isNaN(date.getTime())) {{
+                                                    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                                    return monthNames[date.getMonth()] + ' ' + date.getFullYear();
+                                                }}
+                                            }}
+                                            return this.getLabelForValue(value);
+                                        }}
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }});
+                }}
+            }}
+
+            // Initialize chart on DOM load if canvas exists
+            if (document.getElementById('line-chart-canvas')) {{
+                // If document is already loaded, initialize immediately
+                if (document.readyState === 'loading') {{
+                    document.addEventListener('DOMContentLoaded', initLineChart);
+                }} else {{
+                    // Small delay to ensure canvas is in DOM
+                    setTimeout(initLineChart, 100);
+                }}
+            }}
+
+            // Re-initialize chart when HTMX finishes swapping content
+            document.addEventListener('htmx:afterSettle', function(evt) {{
+                // Check if the event target contains our chart or is our chart
+                if (evt.target.contains(document.getElementById('line-chart-canvas')) ||
+                    evt.target.id === 'line-chart-canvas' ||
+                    evt.target.id === 'dashboard-content') {{
+                    setTimeout(initLineChart, 50); // Small delay to ensure DOM is updated
+                }}
+            }});
+        </script>
+        """
+
+    # Prepare column chart data
+    if column_chart_data and 'months' in column_chart_data and 'series' in column_chart_data:
+        months = column_chart_data['months']
+        series = column_chart_data['series']
+
+        # Prepare datasets from series
+        datasets = []
+        for i, s in enumerate(series):
+            # Assign different colors based on position in series
+            color_index = i % 3  # Cycle through 3 main colors
+            if color_index == 0:
+                bg_color = 'rgba(28, 86, 135, 0.5)'   # blue with transparency
+                border_color = 'rgb(28, 86, 135)'   # blue
+            elif color_index == 1:
+                bg_color = 'rgba(255, 181, 0, 0.5)'  # gold with transparency
+                border_color = 'rgb(255, 181, 0)'   # gold
+            else:
+                bg_color = 'rgba(175, 109, 4, 0.5)'   # orange with transparency
+                border_color = 'rgb(175, 109, 4)'   # orange
+
+            datasets.append({{
+                'label': s.get('name', ''),
+                'data': [float(v) if v is not None else None for v in s.get('data', [])],
+                'backgroundColor': s.get('color', bg_color),
+                'borderColor': s.get('color', border_color),
+                'borderWidth': 1,
+                'type': s.get('type', 'bar')
+            }})
+
+        column_chart_script = f"""
+        <script>
+            // Function to initialize or re-initialize the column chart
+            function initColumnChart() {{
+                const columnCanvas = document.getElementById('column-chart-canvas');
+                if (columnCanvas && typeof Chart !== 'undefined') {{
+                    // Destroy existing chart if it exists
+                    if (columnCanvas.chart) {{
+                        columnCanvas.chart.destroy();
+                    }}
+
+                    // Create new chart instance
+                    columnCanvas.chart = new Chart(columnCanvas, {{
+                        type: 'bar',
+                        data: {{
+                            labels: {json.dumps(months)},
+                            datasets: {json.dumps(datasets)}
+                        }},
+                        options: {{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {{
+                                legend: {{
+                                    display: true,
+                                    position: 'top',
+                                    labels: {{
+                                            boxWidth: 15,
+                                            boxHeight: 11,
+                                            font: {{
+                                                size: 11
+                                            }}
+                                }},
+                                }}
+                            }},
+                            scales: {{
+                                y: {{
+                                    beginAtZero: true,
+                                    grid: {{
+                                        color: 'rgba(178, 180, 174, 0.2)'
+                                    }}
+                                }},
+                                x: {{
+                                    display: true,
+                                    grid: {{
+                                        color: 'rgba(178, 180, 174, 0.2)'
+                                    }},
                                     title: {{
                                         display: true,
                                         text: 'Months'

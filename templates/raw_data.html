@@ -232,7 +232,7 @@
 
             <div class="forecast-content">
                 <div id="forecast-summary" class="forecast-summary"
-                    style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px;">
+                    style="margin-bottom: 20px; padding: 15px; background-color: rgba(var(--brand-gray-rgb), 0.1); border-radius: 8px;">
                     <h4 style="margin: 0 0 10px 0;">Forecast Summary</h4>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
                         <div><strong>Total Forecasts:</strong> <span id="total-forecasts">-</span></div>
@@ -245,7 +245,7 @@
                 <div id="forecast-table-container" style="overflow-x: auto;">
                     <table id="forecast-table" style="width: 100%; border-collapse: collapse;">
                         <thead>
-                            <tr style="background-color: #f8f9fa;">
+                            <tr style="background-color: rgba(var(--brand-gray-rgb), 0.1);">
                                 <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Item</th>
                                 <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Location</th>
                                 <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Forecast Date</th>
@@ -288,7 +288,7 @@
 
             <div class="validation-content">
                 <div id="validation-summary" class="validation-summary"
-                    style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px;">
+                    style="margin-bottom: 20px; padding: 15px; background-color: rgba(var(--brand-gray-rgb), 0.1); border-radius: 8px;">
                     <h4 style="margin: 0 0 10px 0;">Model Performance Summary</h4>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
                         <div><strong>Best Model:</strong> <span id="best-model">-</span></div>
@@ -303,7 +303,7 @@
                         <h4>Model Performance Metrics</h4>
                         <table id="validation-table" style="width: 100%; border-collapse: collapse;">
                             <thead>
-                                <tr style="background-color: #f8f9fa;">
+                                <tr style="background-color: rgba(var(--brand-gray-rgb), 0.1);">
                                     <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Model</th>
                                     <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Period</th>
                                     <th style="padding: 8px; border: 1px solid #ddd; text-align: right;">MAE</th>
@@ -1853,21 +1853,31 @@
         }
 
         function generateColors(count, index, alpha = 0.7) {
-            // Use brand colors defined as RGB values: gold (255, 181, 0), blue (28, 86, 135), orange (175, 109, 4), purple (133, 69, 138), teal (76, 125, 122)
-            const brandColors = [
-                `rgba(255, 181, 0, ${alpha})`,    // gold
-                `rgba(28, 86, 135, ${alpha})`,    // blue
-                `rgba(175, 109, 4, ${alpha})`,    // orange
-                `rgba(133, 69, 138, ${alpha})`,   // purple
-                `rgba(76, 125, 122, ${alpha})`,   // teal
-                `rgba(178, 180, 174, ${alpha})`,  // gray
-                `rgba(255, 99, 132, ${alpha})`,   // fallback colors
+            // Use brand colors defined as RGB values from CSS variables
+            const computedStyles = getComputedStyle(document.documentElement);
+
+            // Extract RGB values from CSS variables
+            const goldRGB = computedStyles.getPropertyValue('--brand-gold-rgb');
+            const blueRGB = computedStyles.getPropertyValue('--brand-blue-rgb');
+            const orangeRGB = computedStyles.getPropertyValue('--brand-orange-rgb');
+            const purpleRGB = computedStyles.getPropertyValue('--brand-purple-rgb');
+            const tealRGB = computedStyles.getPropertyValue('--brand-teal-rgb');
+            const grayRGB = computedStyles.getPropertyValue('--brand-gray-rgb');
+
+            const brandColorVars = [
+                `rgba(${goldRGB}, ${alpha})`,    // gold --brand-gold-rgb
+                `rgba(${blueRGB}, ${alpha})`,    // blue --brand-blue-rgb
+                `rgba(${orangeRGB}, ${alpha})`,  // orange --brand-orange-rgb
+                `rgba(${purpleRGB}, ${alpha})`,  // purple --brand-purple-rgb
+                `rgba(${tealRGB}, ${alpha})`,    // teal --brand-teal-rgb
+                `rgba(${grayRGB}, ${alpha})`,    // gray --brand-gray-rgb
+                `rgba(255, 99, 132, ${alpha})`,  // fallback colors
                 `rgba(54, 162, 235, ${alpha})`,
                 `rgba(255, 205, 86, ${alpha})`,
                 `rgba(75, 192, 192, ${alpha})`
             ];
 
-            return brandColors[index % brandColors.length];
+            return brandColorVars[index % brandColorVars.length];
         }
 
         function formatNumber(num) {
@@ -2361,23 +2371,49 @@
                     datasets: [{
                         label: 'Accuracy %',
                         data: accuracyData,
-                        backgroundColor: 'rgba(28, 86, 135, 0.5)',  // blue
-                        borderColor: 'rgba(28, 86, 135, 1)',        // blue
+                        backgroundColor: generateColors(data.length, 0, 0.5),  // Use brand colors
+                        borderColor: generateColors(data.length, 0, 1),        // Use brand colors
                         borderWidth: 1
                     }, {
                         label: 'MAPE %',
                         data: mapeData,
-                        backgroundColor: 'rgba(255, 181, 0, 0.5)',  // gold
-                        borderColor: 'rgba(255, 181, 0, 1)',        // gold
+                        backgroundColor: generateColors(data.length, 1, 0.5),  // Use brand colors
+                        borderColor: generateColors(data.length, 1, 1),        // Use brand colors
                         borderWidth: 1
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'rgb(var(--brand-gray-rgb))' // Use brand gray for legend text
+                            }
+                        },
+                        tooltip: {
+                            titleColor: 'rgb(var(--brand-gray-rgb))', // Use brand gray for tooltip title
+                            bodyColor: 'rgb(var(--brand-gray-rgb))',  // Use brand gray for tooltip body
+                            backgroundColor: 'rgba(var(--brand-gray-rgb), 0.8)' // Use brand gray for tooltip background
+                        }
+                    },
                     scales: {
                         y: {
-                            beginAtZero: true
+                            beginAtZero: true,
+                            ticks: {
+                                color: 'rgb(var(--brand-gray-rgb))'  // Use brand gray for axis ticks
+                            },
+                            grid: {
+                                color: 'rgba(var(--brand-gray-rgb), 0.2)'  // Use brand gray for grid lines
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: 'rgb(var(--brand-gray-rgb))'  // Use brand gray for axis ticks
+                            },
+                            grid: {
+                                color: 'rgba(var(--brand-gray-rgb), 0.2)'  // Use brand gray for grid lines
+                            }
                         }
                     }
                 }

@@ -9,13 +9,13 @@
     --gold: 255, 181, 0;
     --gray: 178, 180, 174;
     --black: 0, 0, 0;
-    
+
     /* Complementary color palette */
     --orange: 175, 109, 4;
     --purple: 133, 69, 138;
     --blue: 28, 86, 135;
     --teal: 76, 125, 122;
-    
+
     /* Brand colors as RGB values for use with rgba() */
     --brand-gold: rgb(var(--gold));
     --brand-gold-rgb: var(--gold);
@@ -29,7 +29,7 @@
     --brand-teal-rgb: var(--teal);
     --brand-gray: rgb(var(--gray));
     --brand-gray-rgb: var(--gray);
-    
+
     /* Brand color variations for different uses */
     --brand-primary: var(--brand-gold);
     --brand-secondary: var(--brand-blue);
@@ -39,7 +39,7 @@
 
 body {
     font-family: 'Cambria';
-    background: linear-gradient(135deg, #594B61, #545857);
+    background: linear-gradient(135deg, rgb(var(--brand-purple-rgb)), rgb(var(--brand-gray-rgb)));
     min-height: 100vh;
 }
 
@@ -151,7 +151,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .sidebar {
-    background-color: #f4f4f4;
+    background-color: rgba(var(--brand-gray-rgb), 0.1);
     border-right: 1px solid #eee;
     padding: 5px;
     overflow-y: auto;
@@ -176,15 +176,15 @@ input:focus, select:focus, textarea:focus {
 
 .sidebar-toggle-button {
     position: relative;
-    top: 10px;
+    top: 5px;
     z-index: 1000;
-    background: #667eea;
+    background: var(--brand-gray);
     color: white;
     border: none;
     padding: 2px 2px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 18px;
     transition: all 0.3s ease;
     display: block !important;
 }
@@ -200,17 +200,17 @@ input:focus, select:focus, textarea:focus {
 /* Adjust button position when sidebar is hidden */
 #sidebar-left.hidden .sidebar-toggle-button {
     right: auto;
-    top: 10px;
+    top: 5px;
 }
 
 #sidebar-right.hidden .sidebar-toggle-button {
     right: auto;
-    top: 10px;
+    top: 5px;
 }
 
 .sidebar-toggle-button:hover {
-    background: #5a6fd8;
-    transform: scale(1.03);
+    background: var(--brand-gray);
+    transform: scale(1.01);
 }
 
 .toggle-icon {
@@ -557,7 +557,7 @@ input:focus, select:focus, textarea:focus {
     .main-content {
         grid-template-columns: 1fr;
     }
-    
+
     .sidebar {
         border-right: none;
         border-bottom: 1px solid #e9ecef;
@@ -575,8 +575,8 @@ input:focus, select:focus, textarea:focus {
     display: inline-block;
     width: 20px;
     height: 20px;
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #667eea;
+    border: 3px solid rgba(var(--brand-gray-rgb), 0.2);
+    border-top: 3px solid var(--brand-blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -592,7 +592,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .multiselect-container {
-    border: 1px solid #ccc;
+    border: 1px solid var(--brand-gray);
     border-radius: 4px;
     background: white;
     min-height: 20px;
@@ -601,9 +601,9 @@ input:focus, select:focus, textarea:focus {
 }
 
 .multiselect-container:focus-within {
-    border-color: #007bff;
+    border-color: var(--brand-blue);
     outline: none;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+    box-shadow: 0 0 0 2px rgba(var(--brand-blue-rgb), 0.25);
 }
 
 .selected-items {
@@ -616,7 +616,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .selected-tag {
-    background: #007bff;
+    background: var(--brand-blue);
     color: white;
     padding: 2px 8px;
     border-radius: 12px;
@@ -652,7 +652,7 @@ input:focus, select:focus, textarea:focus {
     height: 0;
     border-left: 4px solid transparent;
     border-right: 4px solid transparent;
-    border-top: 4px solid #666;
+    border-top: 4px solid var(--brand-gray);
     pointer-events: none;
     transition: transform 0.2s;
 }
@@ -667,7 +667,7 @@ input:focus, select:focus, textarea:focus {
     left: 0;
     right: 0;
     background: white;
-    border: 1px solid #ccc;
+    border: 1px solid var(--brand-gray);
     border-top: none;
     border-radius: 0 0 4px 4px;
     max-height: 200px;
@@ -689,11 +689,11 @@ input:focus, select:focus, textarea:focus {
 }
 
 .option-item:hover {
-    background: #f8f9fa;
+    background: rgba(var(--brand-gray-rgb), 0.1);
 }
 
 .option-item.selected {
-    background: #e3f2fd;
+    background: rgba(var(--brand-blue-rgb), 0.1);
 }
 
 .option-checkbox {
@@ -703,12 +703,12 @@ input:focus, select:focus, textarea:focus {
 
 .no-options {
     padding: 8px 12px;
-    color: #666;
+    color: var(--brand-gray);
     font-style: italic;
 }
 
 .placeholder {
-    color: #999;
+    color: var(--brand-gray);
     padding: 4px;
 }
 
@@ -717,18 +717,18 @@ select {
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
-    background-image: url("data:image/svg+xml;utf8,<svg fill='darkgray' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+    background-image: url("data:image/svg+xml;utf8,<svg fill='var(--brand-gray)' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
     background-repeat: no-repeat;
     background-position-x: 100%;
     background-position-y: 5px;
-    border: 1px solid #dfdfdf;
+    border: 1px solid var(--brand-gray);
     border-radius: 2px;
 }
 select:focus-within {
-    border-color: #007bff;
+    border-color: var(--brand-blue);
     outline: none;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-    background-image: url("data:image/svg+xml;utf8,<svg fill='darkgray' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 -5 5 5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+    box-shadow: 0 0 0 2px rgba(var(--brand-blue-rgb), 0.25);
+    background-image: url("data:image/svg+xml;utf8,<svg fill='var(--brand-gray)' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 -5 5 5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
     background-repeat: no-repeat;
     background-position-x: 100%;
     background-position-y: 7px;
@@ -736,7 +736,7 @@ select:focus-within {
 .catalog-number-table {
     width: 200px; /* Adjust width as needed */
     margin-right: 0px; /* Space between table and content */
-    border: 1px solid #ccc;
+    border: 1px solid var(--brand-gray);
     border-radius: 4px;
     padding: 5px;
     overflow-y: auto; /* Add scroll if list is long */
@@ -753,19 +753,19 @@ select:focus-within {
 #catalog-number-list div {
     padding: 5px;
     cursor: pointer;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--brand-gray);
 }
 #catalog-number-list div:hover {
-    background-color: #e9e9e9;
+    background-color: rgba(var(--brand-gray-rgb), 0.1);
 }
 #catalog-number-list div.selected {
-    background-color: #cceeff;
+    background-color: rgba(var(--brand-blue-rgb), 0.2);
     font-weight: bold;
 }
 .collapsed {
     width: 50px;
     overflow: hidden;
-    border: 1px solid #ccc;
+    border: 1px solid var(--brand-gray);
 }
 #sidebar-left, #sidebar-right {
     transition: width 0.3s ease;
