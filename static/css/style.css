@@ -178,7 +178,7 @@ input:focus, select:focus, textarea:focus {
     position: relative;
     top: 5px;
     z-index: 1000;
-    background: var(--brand-gray);
+    background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-teal) 100%);
     color: white;
     border: none;
     padding: 2px 2px;
@@ -209,8 +209,8 @@ input:focus, select:focus, textarea:focus {
 }
 
 .sidebar-toggle-button:hover {
-    background: var(--brand-gray);
-    transform: scale(1.01);
+    background: var(--brand-blue);
+    /* transform: scale(1.01);*/
 }
 
 .toggle-icon {
@@ -399,7 +399,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .tab.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-teal) 100%);
     color: white;
     transform: translateY(-2px);
 }

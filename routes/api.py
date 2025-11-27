@@ -314,7 +314,6 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
                     data: {json.dumps(forecast_values_json)},
                     borderColor: '{color_config["border"]}',
                     backgroundColor: '{color_config["bg"]}',
-                    borderDash: [5, 5],
                     tension: 0.1,
                     pointRadius: 3
                 }}
@@ -431,26 +430,36 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
         months = column_chart_data['months']
         series = column_chart_data['series']
 
-        # Prepare datasets from series
+        # Prepare datasets from series with brand colors
         datasets = []
+        # Define brand colors based on CSS variables
+        brand_colors = [
+            'rgba(28, 86, 135, 1)',    # brand-blue with transparency
+            'rgba(255, 181, 0, 1)',   # brand-gold with transparency
+            'rgba(175, 109, 4, 1)',   # brand-orange with transparency
+            'rgba(133, 69, 138, 1)',  # brand-purple with transparency
+            'rgba(76, 125, 122, 1)',  # brand-teal with transparency
+        ]
+
+        border_colors = [
+            'rgb(28, 86, 135)',    # brand-blue
+            'rgb(255, 181, 0)',   # brand-gold
+            'rgb(175, 109, 4)',   # brand-orange
+            'rgb(133, 69, 138)',  # brand-purple
+            'rgb(76, 125, 122)',  # brand-teal
+        ]
+
         for i, s in enumerate(series):
-            # Assign different colors based on position in series
-            color_index = i % 3  # Cycle through 3 main colors
-            if color_index == 0:
-                bg_color = 'rgba(28, 86, 135, 0.5)'   # blue with transparency
-                border_color = 'rgb(28, 86, 135)'   # blue
-            elif color_index == 1:
-                bg_color = 'rgba(255, 181, 0, 0.5)'  # gold with transparency
-                border_color = 'rgb(255, 181, 0)'   # gold
-            else:
-                bg_color = 'rgba(175, 109, 4, 0.5)'   # orange with transparency
-                border_color = 'rgb(175, 109, 4)'   # orange
+            # Use brand colors based on position in series
+            color_index = i % len(brand_colors)
+            bg_color = brand_colors[color_index]
+            border_color = border_colors[color_index]
 
             datasets.append({
                 'label': s.get('name', ''),
                 'data': [float(v) if v is not None else None for v in s.get('data', [])],
-                'backgroundColor': s.get('color', bg_color),
-                'borderColor': s.get('color', border_color),
+                'backgroundColor': bg_color,  # Always use brand colors, ignore series color
+                'borderColor': border_color,  # Always use brand colors, ignore series color
                 'borderWidth': 1,
                 'type': s.get('type', 'bar')
             })
@@ -553,29 +562,39 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
         months = column_chart_data['months']
         series = column_chart_data['series']
 
-        # Prepare datasets from series
+        # Prepare datasets from series with brand colors
         datasets = []
-        for i, s in enumerate(series):
-            # Assign different colors based on position in series
-            color_index = i % 3  # Cycle through 3 main colors
-            if color_index == 0:
-                bg_color = 'rgba(28, 86, 135, 0.5)'   # blue with transparency
-                border_color = 'rgb(28, 86, 135)'   # blue
-            elif color_index == 1:
-                bg_color = 'rgba(255, 181, 0, 0.5)'  # gold with transparency
-                border_color = 'rgb(255, 181, 0)'   # gold
-            else:
-                bg_color = 'rgba(175, 109, 4, 0.5)'   # orange with transparency
-                border_color = 'rgb(175, 109, 4)'   # orange
+        # Define brand colors based on CSS variables
+        brand_colors = [
+            'rgba(28, 86, 135, 1)',    # brand-blue with transparency
+            'rgba(255, 181, 0, 1)',   # brand-gold with transparency
+            'rgba(175, 109, 4, 1)',   # brand-orange with transparency
+            'rgba(133, 69, 138, 1)',  # brand-purple with transparency
+            'rgba(76, 125, 122, 1)',  # brand-teal with transparency
+        ]
 
-            datasets.append({{
+        border_colors = [
+            'rgb(28, 86, 135)',    # brand-blue
+            'rgb(255, 181, 0)',   # brand-gold
+            'rgb(175, 109, 4)',   # brand-orange
+            'rgb(133, 69, 138)',  # brand-purple
+            'rgb(76, 125, 122)',  # brand-teal
+        ]
+
+        for i, s in enumerate(series):
+            # Use brand colors based on position in series
+            color_index = i % len(brand_colors)
+            bg_color = brand_colors[color_index]
+            border_color = border_colors[color_index]
+
+            datasets.append({
                 'label': s.get('name', ''),
                 'data': [float(v) if v is not None else None for v in s.get('data', [])],
-                'backgroundColor': s.get('color', bg_color),
-                'borderColor': s.get('color', border_color),
+                'backgroundColor': bg_color,  # Always use brand colors, ignore series color
+                'borderColor': border_color,  # Always use brand colors, ignore series color
                 'borderWidth': 1,
                 'type': s.get('type', 'bar')
-            }})
+            })
 
         column_chart_script = f"""
         <script>
@@ -949,8 +968,8 @@ async def handle_action(request: Request):
 
             # Run forecasting model (this saves results to the database)
             core_data_service.create_models_action(
-                filtered_df, 
-                session, 
+                filtered_df,
+                session,
                 forecast_version=filter_state.forecast_version,
                 location_hierarchy=filter_state.location1,
                 location_value=filter_state.location2,

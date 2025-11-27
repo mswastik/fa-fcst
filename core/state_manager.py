@@ -305,6 +305,13 @@ class DataState:
         chart_data = chart_data.with_columns(Month=pl.col('SALES_DATE').dt.strftime('%b'))
         chart_data = chart_data.with_columns(Year=pl.col('SALES_DATE').dt.year())
 
+        # Find the latest date that has actual data (no forecast models have values yet)
+        actual_data = chart_data.filter(pl.col('Act Orders Rev').is_not_null())
+        if not actual_data.is_empty():
+            latest_actual_date = actual_data.select(pl.col('SALES_DATE').max()).item()
+        else:
+            latest_actual_date = None
+
         # Group by Year and Month for actuals
         agg_actuals = chart_data.group_by(['Year', 'Month']).sum()['Year', 'Month', 'Act Orders Rev']
 
@@ -342,6 +349,9 @@ class DataState:
         )
         agg_data = agg_data.sort(['Year', 'MonthOrder'])
 
+        # Create chart_data with original date info for comparison
+        original_data_with_dates = chart_data.select(['SALES_DATE', 'Year', 'Month', 'Act Orders Rev']).unique()
+
         unique_years = sorted(agg_data['Year'].unique().to_list())
         series_data = []
         colors = ['#5470C6', '#91CC75', '#EE6666', '#73C0DE',
@@ -354,24 +364,50 @@ class DataState:
             forecast_values = []
             for month in month_order:
                 month_row = year_data.filter(pl.col('Month') == month)
+
+                # Get the corresponding original date for this year-month combination
+                date_matches = original_data_with_dates.filter(
+                    (pl.col('Year') == year) & (pl.col('Month') == month)
+                )
+
+                # Get actual and forecast values from the aggregated data
+                actual_val = None
+                forecast_val = None
                 if len(month_row) > 0:
-                    actual_values.append(month_row['Act Orders Rev'][0] if len(month_row) > 0 else None)
-                    forecast_values.append(
-                        month_row['Forecast_Avg'][0] if 'Forecast_Avg' in month_row.columns and len(month_row) > 0 else None
-                    )
+                    actual_val = month_row['Act Orders Rev'][0] if 'Act Orders Rev' in month_row.columns else None
+                    forecast_val = month_row['Forecast_Avg'][0] if 'Forecast_Avg' in month_row.columns and len(month_row) > 0 else None
+
+                # Get the actual date for comparison (if we have any matching dates in the original data)
+                actual_date_for_comparison = None
+                if not date_matches.is_empty():
+                    actual_date_for_comparison = date_matches['SALES_DATE'].min()  # Use the minimum date in case there are multiple days in the same month
+
+                # Only add actual values if the date is not in the future compared to when forecasts start
+                # and actual data exists
+                if actual_val is not None and actual_date_for_comparison is not None and (latest_actual_date is None or actual_date_for_comparison <= latest_actual_date):
+                    actual_values.append(actual_val)
                 else:
                     actual_values.append(None)
+
+                # Only add forecast values if the date is in the future compared to the latest actual date
+                # and forecast data exists
+                if forecast_val is not None and actual_date_for_comparison is not None and latest_actual_date is not None and actual_date_for_comparison > latest_actual_date:
+                    forecast_values.append(forecast_val)
+                else:
                     forecast_values.append(None)
 
             current_color = colors[i % len(colors)]
 
-            series_data.append({
-                'name': f'{year} - Actual',
-                'type': 'bar',
-                'data': actual_values,
-                'color': current_color
-            })
+            # Only add actual series if actual data exists for this year
+            if any(av is not None for av in actual_values):
+                series_data.append({
+                    'name': f'{year} - Actual',
+                    'type': 'bar',
+                    'data': actual_values,
+                    'color': current_color
+                })
 
+            # Only add forecast series if forecast data exists for this year
             if any(fv is not None for fv in forecast_values):
                 series_data.append({
                     'name': f'{year} - Forecast (Avg)',
