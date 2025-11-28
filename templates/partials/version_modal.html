@@ -38,6 +38,9 @@
                     <button type="button" id="generate-forecast-btn-modal"
                         class="btn inline-flex w-full justify-center rounded-md border border-transparent px-4 py-2 text-base font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm">Generate
                         Forecast</button>
+                    <button type="button" id="select-best-model-btn"
+                        class="mt-3 inline-flex w-full justify-center rounded-md border border-green-600 bg-green-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Select
+                        Best Model</button>
                     <button type="button" id="cancel-btn"
                         class="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-gray-300 px-4 py-2 text-base font-medium text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
                 </div>
@@ -145,6 +148,87 @@
         } else {
             alert('Please select or create a forecast version.');
         }
+    });
+
+    // Handle select best model
+    document.getElementById('select-best-model-btn').addEventListener('click', () => {
+        const selectedVersion = document.getElementById('forecast-version-select').value;
+        if (!selectedVersion) {
+            alert('Please select a forecast version first.');
+            return;
+        }
+
+        // Get current filter state from the page
+        const location1 = document.querySelector('[name="location1"]')?.value || '';
+        const location2 = document.querySelector('[name="location2"]')?.value || '';
+        const product1 = document.querySelector('[name="product1"]')?.value || '';
+        const product2 = document.querySelector('[name="product2"]')?.value || '';
+
+        if (!location1 || !location2 || !product1 || !product2) {
+            alert('Please apply all filters before running model selection.');
+            return;
+        }
+
+        // Close modal first
+        const modal = document.getElementById('modal-content');
+        if (modal && modal.parentElement) {
+            modal.parentElement.removeChild(modal);
+        }
+
+        // Show loading notification (you can make this fancier)
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'model-selection-loading';
+        loadingDiv.className = 'fixed top-4 right-4 bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+        loadingDiv.innerHTML = `
+            <div class="flex items-center">
+                <svg class="animate-spin h-5 w-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Evaluating models and creating ensemble forecast...</span>
+            </div>
+        `;
+        document.body.appendChild(loadingDiv);
+
+        // Call API
+        fetch('/api/select_best_model', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                forecast_version: selectedVersion,
+                selection_mode: 'ensemble',  // default to ensemble
+                location1: location1,
+                location2: location2,
+                product1: product1,
+                product2: product2
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                // Remove loading indicator
+                const loading = document.getElementById('model-selection-loading');
+                if (loading) {
+                    loading.remove();
+                }
+
+                if (data.success) {
+                    alert(`Success! ${data.summary}\\n\\nPlease refresh the page to see the ensemble forecast.`);
+                    // Optionally reload the page to show new forecasts
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                // Remove loading indicator
+                const loading = document.getElementById('model-selection-loading');
+                if (loading) {
+                    loading.remove();
+                }
+                alert('Error running model selection: ' + error);
+            });
     });
 
     // Handle cancel

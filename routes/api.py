@@ -302,7 +302,9 @@ def generate_chart_html(df: pl.DataFrame, line_chart_data: Dict[str, Any], colum
             'MSTL': {'border': 'rgb(76, 125, 122)', 'bg': 'rgba(76, 125, 122, 0.2)'},      # teal
             'AutoCES': {'border': 'rgb(175, 109, 4)', 'bg': 'rgba(175, 109, 4, 0.2)'},      # orange
             'AutoMFLES': {'border': 'rgb(178, 180, 174)', 'bg': 'rgba(178, 180, 174, 0.2)'}, # gray
-            'AutoTBATS': {'border': 'rgb(233, 30, 99)', 'bg': 'rgba(233, 30, 99, 0.2)'}      # pink
+            'AutoTBATS': {'border': 'rgb(233, 30, 99)', 'bg': 'rgba(233, 30, 99, 0.2)'},      # pink
+            'Best': {'border': 'rgb(0, 200, 83)', 'bg': 'rgba(0, 200, 83, 0.2)'},         # green
+            'Ensemble': {'border': 'rgb(156, 39, 176)', 'bg': 'rgba(156, 39, 176, 0.2)'}   # deep purple
         }
 
         for model_name, model_values in forecast_series.items():
@@ -1559,3 +1561,101 @@ async def run_agent_stream_api(request: Request):
         async def error_stream():
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
         return StreamingResponse(error_stream(), media_type="text/plain")
+
+
+@router.post("/api/select_best_model")
+async def select_best_model(request: Request):
+    """
+    Trigger model selection/ensemble creation for a selected forecast version.
+    Evaluates existing forecasts and creates Best or Ensemble forecast.
+    """
+    try:
+        # Get form data
+        form_data = await request.form()
+        
+        # Extract parameters
+        forecast_version = form_data.get('forecast_version', '')
+        selection_mode = form_data.get('selection_mode', 'ensemble')  # 'best' or 'ensemble'
+        location1 = form_data.get('location1', '')
+        location2 = form_data.get('location2', '')
+        product1 = form_data.get('product1', '')
+        product2 = form_data.get('product2', '')
+        
+        print(f"Model selection requested for version: {forecast_version}, mode: {selection_mode}")
+        print(f"Filters: {location1}={location2}, {product1}={product2}")
+        
+        # Validate inputs
+        if not forecast_version:
+            return JSONResponse({
+                'success': False,
+                'message': 'Please select a forecast version'
+            })
+        
+        if not (location1 and location2 and product1 and product2):
+            return JSONResponse({
+                'success': False,
+                'message': 'Please apply all filters before running model selection'
+            })
+        
+        # Get filtered data for this version
+        db_service = get_database_service()
+        filtered_df = db_service.get_filtered_sales_actuals(
+            location_col=location1,
+            location_val=location2,
+            product_col=product1,
+            product_val=product2,
+            user_id="system"
+        )
+        
+        if filtered_df is None or filtered_df.is_empty():
+            return JSONResponse({
+                'success': False,
+                'message': 'No data found with current filters'
+            })
+        
+        # Run model selection pipeline
+        from core.data_service import run_model_selection_pipeline
+        
+        result_df, metadata = run_model_selection_pipeline(
+            df=filtered_df,
+            forecast_version=forecast_version,
+            location_hierarchy=location1,
+            location_value=location2,
+            product_hierarchy=product1,
+            product_value=product2,
+            selection_mode=selection_mode
+        )
+        
+        # Build summary message
+        model_type = "Best" if selection_mode == "best" else "Ensemble"
+        models_used = metadata.get('models_selected', {})
+        series_count = metadata.get('series_processed', 0)
+        
+        models_summary = ", ".join([f"{model}: {count}" for model, count in models_used.items()])
+        
+        summary_message = f"{model_type} forecasts created for {series_count} series. Models used: {models_summary}"
+        
+        return JSONResponse({
+            'success': True,
+            'series_count': series_count,
+            'summary': summary_message,
+            'forecast_version': forecast_version,
+            'model_type': model_type,
+            'metadata': metadata
+        })
+        
+    except ValueError as ve:
+        # Handle specific validation errors
+        print(f"Validation error in model selection: {ve}")
+        return JSONResponse({
+            'success': False,
+            'message': str(ve)
+        })
+    except Exception as e:
+        print(f"Error in select_best_model: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({
+            'success': False,
+            'message': f'Error during model selection: {str(e)}'
+        })

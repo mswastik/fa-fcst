@@ -10,7 +10,9 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from forecasting.service import ForecastingService
 from forecasting.data_processor import DataCleaner
+from forecasting.model_selector import ModelSelector
 from core.db_service import get_database_service
+import numpy as np
 
 def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFrame:
     """Create forecasts for each unique_id using MLForecast with parallel processing
@@ -71,7 +73,7 @@ def create_mlforecast_models(df: pl.DataFrame, horizon: int = 60) -> pl.DataFram
         # 2. Define max_date (last complete month)
         max_date = datetime.today() - relativedelta(months=1)
 
-        # 3. Generate date ranges for all series at once
+        # 3. Generate date ranges for each series at once
         # This creates a grid of (unique_id, ds) covering min_date to max_date for each series
         # 3. Generate date ranges using cross join to avoid "non-scalar start" error
         # Create a global date range from the absolute minimum date to max_date
@@ -320,6 +322,160 @@ def run_mlforecast_pipeline(df: pl.DataFrame, state: DataState = None, forecast_
         import traceback
         traceback.print_exc()
         return df, {'error': str(e), 'forecasts_generated': 0, 'forecasts_saved': 0}
+
+
+def run_model_selection_pipeline(
+    df: pl.DataFrame,
+    forecast_version: str,
+    location_hierarchy: Optional[str] = None,
+    location_value: Optional[str] = None,
+    product_hierarchy: Optional[str] = None,
+    product_value: Optional[str] = None,
+    selection_mode: str = "ensemble"
+) -> Tuple[pl.DataFrame, Dict[str, Any]]:
+    """
+    Run model selection pipeline to evaluate forecasts and select best or create ensemble.
+    
+    Args:
+        df: Polars DataFrame with historical sales data
+        forecast_version: Version name to retrieve or create forecasts for
+        location_hierarchy: Location filter (e.g., "Region")
+        location_value: Location value (e.g., "ASEAN")
+        product_hierarchy: Product filter (e.g., "Franchise")
+        product_value: Product value (e.g., "Surgical")
+        selection_mode: "best" for best model selection, "ensemble" for weighted ensemble
+        
+    Returns:
+        Tuple of (result_dataframe, metadata_dict)
+    """
+    try:
+        db_service = get_database_service()
+        
+        # 1. Check if forecast_version exists and has forecasts
+        print(f"Checking for existing forecasts in version: {forecast_version}")
+        existing_forecasts = db_service.get_forecasts_for_version(
+            forecast_version=forecast_version,
+            location_hierarchy=location_hierarchy,
+            location_value=location_value,
+            product_hierarchy=product_hierarchy,
+            product_value=product_value
+        )
+        
+        # 2. If forecasts exist, use them. Otherwise, error (should generate first)
+        if existing_forecasts is None or existing_forecasts.is_empty():
+            raise ValueError(f"No forecasts found for version '{forecast_version}'. Please generate forecasts first.")
+        
+        print(f"Found {len(existing_forecasts)} existing forecast records")
+        
+        # 3. Prepare historical data for evaluation
+        prepared_df = DataCleaner.prepare_data_for_mlforecast(df)
+        
+        # 4. Group forecasts by unique_id and evaluate each series
+        model_cols = ['xgb', 'MSTL', 'AutoCES', 'AutoMFLES', 'AutoTBATS']  # AutoARIMA removed as commented out
+        selector = ModelSelector()
+        
+        # Results storage
+        selected_forecasts = []
+        metadata_summary = {
+            'series_processed': 0,
+            'models_selected': {},
+            'average_scores': {},
+           'selection_mode': selection_mode
+        }
+        
+        # Group by unique_id
+        forecast_groups = existing_forecasts.partition_by('unique_id', as_dict=True)
+        
+        for unique_id_tuple, forecast_group in forecast_groups.items():
+            unique_id = unique_id_tuple[0] if isinstance(unique_id_tuple, tuple) else unique_id_tuple
+            
+            # Get historical data for this series
+            hist_data = prepared_df.filter(pl.col('unique_id') == str(unique_id))
+            
+            if hist_data.is_empty():
+                print(f"Warning: No historical data found for {unique_id}, skipping")
+                continue
+            
+            historical_values = hist_data['y'].to_numpy()
+            
+            # Extract model forecasts
+            all_forecasts = {}
+            for model_col in model_cols:
+                if model_col in forecast_group.columns:
+                    model_forecasts = forecast_group.filter(pl.col(model_col).is_not_null())
+                    if not model_forecasts.is_empty():
+                        all_forecasts[model_col] = model_forecasts[model_col].to_numpy()
+            
+            if not all_forecasts:
+                print(f"Warning: No valid forecasts for {unique_id}, skipping")
+                continue
+            
+            # Run model selection
+            try:
+                selected_forecast, metadata = selector.evaluate_and_select(
+                    all_forecasts, historical_values, mode=selection_mode
+                )
+                
+                # Create result DataFrame for this series
+                forecast_dates = forecast_group['forecast_date'].unique().sort()
+                result_df = pl.DataFrame({
+                    'unique_id': [str(unique_id)] * len(selected_forecast),
+                    'forecast_date': forecast_dates[:len(selected_forecast)],
+                    'forecast_value': selected_forecast,
+                    'item_skey': [forecast_group['item_skey'][0]] * len(selected_forecast),
+                    'location_skey': [forecast_group['location_skey'][0]] * len(selected_forecast)
+                })
+                
+                selected_forecasts.append(result_df)
+                metadata_summary['series_processed'] += 1
+                
+                # Track which models were selected
+                if selection_mode == 'best':
+                    selected_model = metadata.get('selected_model', 'Unknown')
+                    metadata_summary['models_selected'][selected_model] = \
+                        metadata_summary['models_selected'].get(selected_model, 0) + 1
+                elif selection_mode == 'ensemble':
+                    for model in metadata.get('models_used', []):
+                        metadata_summary['models_selected'][model] = \
+                            metadata_summary['models_selected'].get(model, 0) + 1
+                
+            except Exception as e:
+                print(f"Error evaluating forecasts for {unique_id}: {e}")
+                continue
+        
+        if not selected_forecasts:
+            raise ValueError("No forecasts could be selected/ensemble created")
+        
+        # 5. Combine all selected forecasts
+        combined_selected = pl.concat(selected_forecasts)
+        
+        # 6. Save to database with model_type="Best" or "Ensemble"
+        model_type = "Best" if selection_mode == "best" else "Ensemble"
+        
+        print(f"\nSaving {len(combined_selected)} {model_type} forecast records to database")
+        saved_count = db_service.insert_forecasts(
+            combined_selected,
+            model_type=model_type,
+            forecast_version=forecast_version,
+            forecast_value_col='forecast_value',
+            location_hierarchy=location_hierarchy,
+            location_value=location_value,
+            product_hierarchy=product_hierarchy,
+            product_value=product_value
+        )
+        
+        metadata_summary['forecasts_saved'] = saved_count
+        metadata_summary['model_types_summary'] = f"{model_type} forecasts created from evaluation"
+        
+        print(f"Successfully saved {saved_count} {model_type} forecast records")
+        
+        return combined_selected, metadata_summary
+        
+    except Exception as e:
+        print(f"Error in run_model_selection_pipeline: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 def create_models_action(df: pl.DataFrame, state: DataState = None, forecast_version: Optional[str] = None,

@@ -117,6 +117,18 @@
             <select class="field-list field-select" data-zone="values" id="value-fields" multiple></select>
         </div>
         <div class="field-group">
+            <h4>Line Chart Fields</h4>
+            <select class="field-list" id="line-chart-fields" multiple>
+                <option value="">Select fields for line chart...</option>
+            </select>
+        </div>
+        <div class="field-group">
+            <h4>Bar Chart Fields</h4>
+            <select class="field-list" id="bar-chart-fields" multiple>
+                <option value="">Select fields for bar chart...</option>
+            </select>
+        </div>
+        <div class="field-group">
             <h4>Facet By</h4>
             <select class="field-list" id="facet-field">
                 <option value="">None</option>
@@ -171,16 +183,6 @@
         </div>
 
         <div id="chart-view" class="tab-content active">
-            <div class="chart-controls">
-                <select class="chart-select" id="chart-type" onchange="updateChart()">
-                    <option value="line">Line Chart</option>
-                    <option value="bar">Bar Chart</option>
-                    <option value="pie">Pie Chart</option>
-                    <option value="doughnut">Doughnut Chart</option>
-                    <option value="radar">Radar Chart</option>
-                    <option value="polarArea">Polar Area</option>
-                </select>
-            </div>
             <div class="chart-controls"
                 style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <div>
@@ -474,7 +476,7 @@
                 }
 
                 // Auto-select xgb, AutoARIMA, and MSTL forecast models
-                const forecastModels = ['xgb', 'AutoARIMA', 'MSTL'];
+                const forecastModels = ['xgb', 'Ensemble', 'MSTL','Fcst Stat Prelim Rev'];
                 forecastModels.forEach(model => {
                     const modelOption = Array.from(valueFieldsSelect.options).find(opt => opt.value === model);
                     if (modelOption) {
@@ -603,12 +605,12 @@
                                     return '<div>' + text + '</div>';
                                 },
                                 item: function (data, escape) {
-                                    // Truncate long items for better display in selection
+                                    // Truncate long items for better display in selection and add close button
                                     let text = escape(data.text);
                                     if (text.length > 30) {
                                         text = text.substring(0, 30) + '...';
                                     }
-                                    return '<div title="' + escape(data.text) + '" class="field-selection-item">' + text + '</div>';
+                                    return '<div title="' + escape(data.text) + '" class="field-selection-item">' + text + '<span class="remove-item" onclick="event.stopPropagation();">×</span></div>';
                                 }
                             },
                             onChange: function (value) {
@@ -1681,7 +1683,6 @@
             currentCharts = [];
             if (!currentPivotData) return;
 
-            const chartType = document.getElementById('chart-type').value;
             const maxCharts = parseInt(document.getElementById('chart-limit').value) || 10;
 
             if (!facetField) {
@@ -1693,7 +1694,7 @@
 
                 const ctx = canvas.getContext('2d');
                 const chartData = prepareChartData(currentPivotData);
-                const config = createChartConfig(chartType, chartData);
+                const config = createChartConfig('bar', chartData);
                 currentCharts.push(new Chart(ctx, config));
             } else {
                 // Facet charts - but only create charts for facet values that have data after filtering
@@ -1735,7 +1736,7 @@
 
                         const ctx = canvas.getContext('2d');
                         const chartData = prepareChartData(pivotData);
-                        const config = createChartConfig(chartType, chartData, `${facetField}: ${facetValue}`);
+                        const config = createChartConfig('bar', chartData, `${facetField}: ${facetValue}`);
                         currentCharts.push(new Chart(ctx, config));
                     }
                 });
@@ -1759,10 +1760,10 @@
                             text: title
                         },
                         legend: {
-                            display: chartType !== 'pie' && chartType !== 'doughnut'
+                            display: true
                         }
                     },
-                    scales: chartType === 'pie' || chartType === 'doughnut' || chartType === 'polarArea' ? {} : {
+                    scales: {
                         y: {
                             beginAtZero: true
                         }
@@ -1777,6 +1778,11 @@
 
             const columnFields = getFieldsFromZone('columns');
             const valueFields = getFieldsFromZone('values');
+
+            // Get chart type selections from the new select elements
+            const lineChartFields = getSelectedFields('line-chart-fields') || [];
+            const barChartFields = getSelectedFields('bar-chart-fields') || [];
+
             // Sort labels chronologically if they're dates, otherwise keep original sorting
             const rawLabels = pivotData.rowKeys;
             const sortedLabels = [...rawLabels].sort((a, b) => {
@@ -1808,6 +1814,14 @@
                         return pivotData.data[rowKey]['Total']?.[key] || 0;
                     });
 
+                    // Determine if this field should be a line or bar chart based on user selection
+                    let chartType = 'line'; // Default to line
+                    if (barChartFields.includes(vf.field)) {
+                        chartType = 'bar';
+                    } else if (lineChartFields.includes(vf.field)) {
+                        chartType = 'line';
+                    }
+
                     // For forecast fields, use a more descriptive label
                     let label = `${vf.field} (${vf.aggregation})`;
                     if (vf.field.startsWith('forecast_')) {
@@ -1815,13 +1829,29 @@
                         label = `${modelName} Forecast`;
                     }
 
-                    datasets.push({
-                        label: label,
-                        data: data,
-                        backgroundColor: generateColors(pivotData.rowKeys.length, index),
-                        borderColor: generateColors(pivotData.rowKeys.length, index, 0.8),
-                        borderWidth: 2
-                    });
+                    if (chartType === 'line') {
+                        datasets.push({
+                            label: label,
+                            data: data,
+                            type: 'line',
+                            fill: false,
+                            borderColor: generateColors(pivotData.rowKeys.length, index, 1),
+                            backgroundColor: generateColors(pivotData.rowKeys.length, index, 0.2),
+                            borderWidth: 2,
+                            tension: 0.1, // Smooth the line slightly
+                            yAxisID: 'y-axis-1'
+                        });
+                    } else { // bar chart
+                        datasets.push({
+                            label: label,
+                            data: data,
+                            type: 'bar',
+                            backgroundColor: generateColors(pivotData.rowKeys.length, index, 0.7),
+                            borderColor: generateColors(pivotData.rowKeys.length, index, 1),
+                            borderWidth: 1,
+                            yAxisID: 'y-axis-1'
+                        });
+                    }
                 });
             } else {
                 pivotData.columnValues.forEach((colValue, colIndex) => {
@@ -1831,6 +1861,14 @@
                             return pivotData.data[rowKey]?.[colValue]?.[key] || 0;
                         });
 
+                        // Determine if this field should be a line or bar chart based on user selection
+                        let chartType = 'line'; // Default to line
+                        if (barChartFields.includes(vf.field)) {
+                            chartType = 'bar';
+                        } else if (lineChartFields.includes(vf.field)) {
+                            chartType = 'line';
+                        }
+
                         // For forecast fields, use a more descriptive label
                         let label = `${colValue} - ${vf.field} (${vf.aggregation})`;
                         if (vf.field.startsWith('forecast_')) {
@@ -1838,13 +1876,29 @@
                             label = `${colValue} - ${modelName} Forecast`;
                         }
 
-                        datasets.push({
-                            label: label,
-                            data: data,
-                            backgroundColor: generateColors(pivotData.columnValues.length * valueFields.length, colIndex * valueFields.length + valIndex, 0.7),
-                            borderColor: generateColors(pivotData.columnValues.length * valueFields.length, colIndex * valueFields.length + valIndex, 1),
-                            borderWidth: 2
-                        });
+                        if (chartType === 'line') {
+                            datasets.push({
+                                label: label,
+                                data: data,
+                                type: 'line',
+                                fill: false,
+                                borderColor: generateColors(pivotData.columnValues.length * valueFields.length, colIndex * valueFields.length + valIndex, 1),
+                                backgroundColor: generateColors(pivotData.columnValues.length * valueFields.length, colIndex * valueFields.length + valIndex, 0.2),
+                                borderWidth: 2,
+                                tension: 0.1, // Smooth the line slightly
+                                yAxisID: 'y-axis-1'
+                            });
+                        } else { // bar chart
+                            datasets.push({
+                                label: label,
+                                data: data,
+                                type: 'bar',
+                                backgroundColor: generateColors(pivotData.columnValues.length * valueFields.length, colIndex * valueFields.length + valIndex, 0.7),
+                                borderColor: generateColors(pivotData.columnValues.length * valueFields.length, colIndex * valueFields.length + valIndex, 1),
+                                borderWidth: 1,
+                                yAxisID: 'y-axis-1'
+                            });
+                        }
                     });
                 });
             }
@@ -1904,10 +1958,24 @@
                 return;
             }
             console.log("filtered :", JSON.stringify(filterData[0]))
-            // Get unique catalog numbers from filtered data (after activeFilters)
-            const uniqueCatalogNumbers = Array.from(
-                new Set(filteredData.map(row => row.CatalogNumber).filter(cn => cn !== undefined && cn !== null))
-            ).sort();
+
+            // Group filtered data by catalog number and calculate total Act Orders Rev for each
+            const catalogTotals = {};
+            filteredData.forEach(row => {
+                const catalogNumber = row.CatalogNumber;
+                if (catalogNumber !== undefined && catalogNumber !== null) {
+                    const actOrdersRev = row['Act Orders Rev'] || 0;
+                    if (!catalogTotals[catalogNumber]) {
+                        catalogTotals[catalogNumber] = 0;
+                    }
+                    catalogTotals[catalogNumber] += actOrdersRev;
+                }
+            });
+
+            // Get unique catalog numbers and sort by total Act Orders Rev in descending order
+            const uniqueCatalogNumbers = Object.keys(catalogTotals).sort((a, b) => {
+                return catalogTotals[b] - catalogTotals[a]; // Descending order
+            });
 
             if (uniqueCatalogNumbers.length === 0) {
                 catalogNumberListDiv.innerHTML = '<p>No Catalog Numbers found.</p>';

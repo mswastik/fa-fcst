@@ -611,7 +611,7 @@ class DatabaseService:
             except:
                 return []
 
-    def insert_forecasts(self, forecast_df: pl.DataFrame, model_type: str, forecast_version: Optional[str] = None, 
+    def insert_forecasts(self, forecast_df: pl.DataFrame, model_type: str, forecast_version: Optional[str] = None,
                          user_id: str = None, forecast_value_col: Optional[str] = None,
                          location_hierarchy: Optional[str] = None, location_value: Optional[str] = None,
                          product_hierarchy: Optional[str] = None, product_value: Optional[str] = None) -> int:
@@ -716,7 +716,7 @@ class DatabaseService:
 
         # Create or get version_id for this forecast run
         version_id = self._create_or_get_version_id(
-            current_model_version, 
+            current_model_version,
             user_id=user_id,
             location_hierarchy=location_hierarchy,
             location_value=location_value,
@@ -1143,9 +1143,9 @@ class DatabaseService:
                 INNER JOIN da.product_hierarchy ph ON sa.item_skey = ph.demantra_item_skey
                 INNER JOIN da.location_hierarchy lh ON sa.location_skey = lh.location_skey
                 WHERE {where_clause}
-                
+
                 UNION
-                
+
                 SELECT DISTINCT f.item_skey, f.location_skey
                 FROM da.forecasts f
                 INNER JOIN da.forecast_versions fv ON f.version_id = fv.version_id
@@ -1175,12 +1175,16 @@ class DatabaseService:
             sa.location_skey,
             sa.sales_date AS "SALES_DATE",
             sa.act_orders_rev AS "Act Orders Rev",
+            sa.fcst_stat_prelim_rev AS "Fcst Stat Prelim Rev",
             NULL AS "xgb",
             NULL AS "AutoARIMA",
             NULL AS "MSTL",
             NULL AS "AutoCES",
             NULL AS "AutoMFLES",
             NULL AS "AutoTBATS",
+            NULL AS "Ensemble",
+            EXTRACT(MONTH FROM sa.sales_date) AS "Month",
+            EXTRACT(YEAR FROM sa.sales_date) AS "Year",
             lh.country AS "Country",
             lh.region AS "Region",
             lh.area AS "Area",
@@ -1202,12 +1206,16 @@ class DatabaseService:
             f.location_skey,
             f.forecast_date AS "SALES_DATE",
             NULL AS "Act Orders Rev",
+            NULL AS "Fcst Stat Prelim Rev",
             MAX(CASE WHEN f.model_type = 'xgb' THEN f.forecast_value ELSE NULL END) AS "xgb",
             MAX(CASE WHEN f.model_type = 'AutoARIMA' THEN f.forecast_value ELSE NULL END) AS "AutoARIMA",
             MAX(CASE WHEN f.model_type LIKE 'MSTL%' THEN f.forecast_value ELSE NULL END) AS "MSTL",
             MAX(CASE WHEN f.model_type LIKE 'AutoCES%' THEN f.forecast_value ELSE NULL END) AS "AutoCES",
             MAX(CASE WHEN f.model_type LIKE 'AutoMFLES%' THEN f.forecast_value ELSE NULL END) AS "AutoMFLES",
             MAX(CASE WHEN f.model_type = 'AutoTBATS' THEN f.forecast_value ELSE NULL END) AS "AutoTBATS",
+            MAX(CASE WHEN f.model_type IN ('Ensemble', 'Best') THEN f.forecast_value ELSE NULL END) AS "Ensemble",
+            EXTRACT(MONTH FROM f.forecast_date) AS "Month",
+            EXTRACT(YEAR FROM f.forecast_date) AS "Year",
             lh.country AS "Country",
             lh.region AS "Region",
             lh.area AS "Area",
@@ -1243,6 +1251,97 @@ class DatabaseService:
         """
 
         return self.execute_query(full_query, tuple(full_params), user_id)
+
+    def get_forecasts_for_version(
+        self,
+        forecast_version: str,
+        location_hierarchy: Optional[str] = None,
+        location_value: Optional[str] = None,
+        product_hierarchy: Optional[str] = None,
+        product_value: Optional[str] = None,
+        user_id: str = "system"
+    ) -> pl.DataFrame:
+        """
+        Retrieve all forecasts for a given forecast version from the database.
+        Returns pivoted DataFrame with columns: unique_id, forecast_date, and one column per model.
+
+        Args:
+            forecast_version: Name of the forecast version to retrieve
+            location_hierarchy: Optional location filter (e.g., "Region")
+            location_value: Optional location value (e.g., "ASEAN")
+            product_hierarchy: Optional product filter (e.g., "Franchise")
+            product_value: Optional product value (e.g., "Surgical")
+            user_id: User ID for database connection
+
+        Returns:
+            Polars DataFrame with forecasts in wide format (one column per model)
+        """
+        if not user_id:
+            user_id = "system"
+
+        # Build WHERE conditions
+        where_conditions = []
+        params = []
+
+        # Map display names to database column names
+        column_mapping = {
+            'Region': 'region',
+            'Country': 'country',
+            'Area': 'area',
+            'Franchise': 'franchise',
+            'IBP Level 5': 'ibp_level_5',
+            'IBP Level 6': 'ibp_level_6',
+            'CatalogNumber': 'catalog_number'
+        }
+
+        # Start with version filter
+        where_conditions.append("fv.version_name = ?")
+        params.append(forecast_version)
+
+        # Add location filter if provided
+        if location_hierarchy and location_value:
+            db_location_col = column_mapping.get(location_hierarchy, location_hierarchy.lower().replace(' ', '_'))
+            where_conditions.append(f"lh.{db_location_col} = ?")
+            params.append(location_value)
+
+        # Add product filter if provided
+        if product_hierarchy and product_value:
+            db_product_col = column_mapping.get(product_hierarchy, product_hierarchy.lower().replace(' ', '_'))
+            where_conditions.append(f"ph.{db_product_col} = ?")
+            params.append(product_value)
+
+        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+
+        # Query to get all forecasts for this version, pivoted by model type
+        query = f"""
+        SELECT
+            CONCAT(f.item_skey, '_', f.location_skey) AS unique_id,
+            f.forecast_date,
+            f.item_skey,
+            f.location_skey,
+            MAX(CASE WHEN f.model_type = 'xgb' THEN f.forecast_value ELSE NULL END) AS xgb,
+            MAX(CASE WHEN f.model_type = 'AutoARIMA' THEN f.forecast_value ELSE NULL END) AS AutoARIMA,
+            MAX(CASE WHEN f.model_type LIKE 'MSTL%' THEN f.forecast_value ELSE NULL END) AS MSTL,
+            MAX(CASE WHEN f.model_type LIKE 'AutoCES%' THEN f.forecast_value ELSE NULL END) AS AutoCES,
+            MAX(CASE WHEN f.model_type LIKE 'AutoMFLES%' THEN f.forecast_value ELSE NULL END) AS AutoMFLES,
+            MAX(CASE WHEN f.model_type = 'AutoTBATS' THEN f.forecast_value ELSE NULL END) AS AutoTBATS,
+            MAX(CASE WHEN f.model_type = 'Best' THEN f.forecast_value ELSE NULL END) AS Best,
+            MAX(CASE WHEN f.model_type = 'Ensemble' THEN f.forecast_value ELSE NULL END) AS Ensemble
+        FROM da.forecasts f
+        INNER JOIN da.forecast_versions fv ON f.version_id = fv.version_id
+        INNER JOIN da.product_hierarchy ph ON f.item_skey = ph.demantra_item_skey
+        INNER JOIN da.location_hierarchy lh ON f.location_skey = lh.location_skey
+        WHERE {where_clause}
+        GROUP BY f.item_skey, f.location_skey, f.forecast_date
+        ORDER BY unique_id, f.forecast_date
+        """
+
+        result = self.execute_query(query, tuple(params) if params else None, user_id)
+
+        logger.info(f"Retrieved {len(result) if result is not None else 0} forecast records for version: {forecast_version}")
+
+        return result if result is not None else pl.DataFrame()
+
 
     def close_user_session(self, user_id: str):
         """Close the database session for a specific user"""

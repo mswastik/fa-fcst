@@ -107,7 +107,7 @@ class ForecastingService:
 
         sf_models = [
             # AutoARIMA: stepwise=False and approximation=False are CRITICAL for avoiding flat forecasts on seasonal data
-            AutoARIMA(season_length=12, approximation=True, stepwise=True),
+            #AutoARIMA(season_length=12, approximation=True, stepwise=True),
             MSTL(season_length=[12]),
             AutoCES(season_length=12),
             AutoMFLES(season_length=12, test_size=12),
