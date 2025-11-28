@@ -467,18 +467,19 @@
             }
 
             if (lineChartFieldsSelect && !hasLineSelection) {
-                const defaultValueField = 'Act Orders Rev';
-                const valueOption = Array.from(lineChartFieldsSelect.options).find(opt => opt.value === defaultValueField);
+                const defaultValueField = ['Act Orders Rev','xgb', 'Ensemble', 'MSTL','Fcst Stat Prelim Rev'];
+                defaultValueField.forEach(model => {
+                const valueOption = Array.from(lineChartFieldsSelect.options).find(opt => opt.value === model);
                 if (valueOption) {
                     valueOption.selected = true;
                     console.log("Default line chart field 'Act Orders Rev' selected.");
                 } else {
                     console.log("Default line chart field 'Act Orders Rev' not found.");
                 }
-            }
-
+            });
+        }
             if (barChartFieldsSelect && !hasBarSelection) {
-                const forecastModels = ['xgb', 'Ensemble', 'MSTL','Fcst Stat Prelim Rev'];
+                const forecastModels = [];
                 forecastModels.forEach(model => {
                     const modelOption = Array.from(barChartFieldsSelect.options).find(opt => opt.value === model);
                     if (modelOption) {
