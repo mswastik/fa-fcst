@@ -39,7 +39,7 @@
                 {% if location_options %}
                 {% include 'partials/raw_data_location_select2.html' %}
                 {% else %}
-                <label class="block text-sm font-medium text-gray-700" id="location2-label">{{ 
+                <label class="block text-sm font-medium text-gray-700" id="location2-label">{{
                     initial_location_options[0] }}
                 </label>
                 <select name="location2"
@@ -347,8 +347,6 @@
             </div>
         </div>
     </div>
-
-
     <script>
         // Global variables for data management
         let rawData = null;
@@ -543,11 +541,11 @@
             // Prefer TomSelect API if available, as it's more reliable than selectedOptions
             if (selectElement.tomselect) {
                 const values = selectElement.tomselect.getValue();
-                // TomSelect's getValue() returns an array for multi-selects 
+                // TomSelect's getValue() returns an array for multi-selects
                 // and a string for single-selects.
                 return Array.isArray(values) ? values : (values ? [values] : []);
             }
-            
+
             // Fallback to standard DOM properties for elements without TomSelect
             const selectedOptions = Array.from(selectElement.selectedOptions);
             return selectedOptions.map(option => option.value);
@@ -593,6 +591,7 @@
                         const config = {
                             create: false,
                             allowEmptyOption: true,
+                            plugins: ['remove_button'], // Add remove button plugin
                             maxItems: null, // Allow multiple selections
                             placeholder: 'Select fields...',
                             searchPlaceholder: 'Search fields...',
@@ -614,7 +613,7 @@
                                     if (text.length > 30) {
                                         text = text.substring(0, 30) + '...';
                                     }
-                                    return '<div title="' + escape(data.text) + '" class="field-selection-item">' + text + '<span class="remove-item" onclick="event.stopPropagation();">×</span></div>';
+                                    return '<div title="' + escape(data.text) + '" class="field-selection-item">' + text + '</div>';
                                 }
                             },
                             onChange: function (value) {
@@ -648,6 +647,7 @@
                         create: false,
                         allowEmptyOption: true,
                         closeAfterSelect: true,
+                        plugins: ['remove_button'], // Add remove button plugin
                         placeholder: 'Search or select...',
                         searchPlaceholder: 'Type to search...',
                         render: {
@@ -727,6 +727,7 @@
                             const config = {
                                 create: false,
                                 allowEmptyOption: true,
+                                plugins: ['remove_button'], // Add remove button plugin
                                 maxItems: null, // Allow multiple selections
                                 placeholder: 'Select fields...',
                                 searchPlaceholder: 'Search fields...',
@@ -1324,11 +1325,11 @@
 
         function getFieldsFromZone(zone) {
             const zoneElement = document.getElementById(`${zone === 'rows' ? 'row' : zone}-fields`);
-            
+
             // Prefer TomSelect API if available, as it's more reliable than selectedOptions
             if (zoneElement && zoneElement.tomselect) {
                 const values = zoneElement.tomselect.getValue();
-                // TomSelect's getValue() returns an array for multi-selects 
+                // TomSelect's getValue() returns an array for multi-selects
                 // and a string for single-selects.
                 return Array.isArray(values) ? values : (values ? [values] : []);
             }
@@ -1778,10 +1779,6 @@
                     }
 
                     let label = `${vf.field} (${vf.aggregation})`;
-                    if (vf.field.startsWith('forecast_')) {
-                        const modelName = vf.field.replace('forecast_', '');
-                        label = `${modelName} Forecast`;
-                    }
 
                     if (chartType === 'line') {
                         datasets.push({
@@ -1821,10 +1818,6 @@
                         }
 
                         let label = `${colValue} - ${vf.field} (${vf.aggregation})`;
-                        if (vf.field.startsWith('forecast_')) {
-                            const modelName = vf.field.replace('forecast_', '');
-                            label = `${colValue} - ${modelName} Forecast`;
-                        }
 
                         if (chartType === 'line') {
                             datasets.push({
@@ -2151,11 +2144,6 @@
                     // Let's collect all forecast data by looking for columns that start with 'forecast_'
                     const forecastColumns = [];
                     const firstRow = currentData;
-                    Object.keys(firstRow).forEach(key => {
-                        if (key.startsWith('forecast_')) {
-                            forecastColumns.push(key);
-                        }
-                    });
 
                     // Create a summary of forecast data for display
                     forecastData = [];
