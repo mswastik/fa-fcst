@@ -1702,6 +1702,10 @@
         }
 
         function createChartConfig(chartType, chartData, title = 'Pivot Data Visualization') {
+            // Get the computed styles to extract RGB values from CSS variables
+            const computedStyles = getComputedStyle(document.documentElement);
+            const brandGrayRGB = computedStyles.getPropertyValue('--brand-gray-rgb').trim();
+
             return {
                 type: chartType,
                 data: chartData,
@@ -1719,6 +1723,22 @@
                         },
                         legend: {
                             display: true
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)', // Dark background for better contrast
+                            titleColor: 'rgb(255, 255, 255)', // White text for better contrast
+                            bodyColor: 'rgb(255, 255, 255)',  // White text for better contrast
+                            titleFont: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            bodyFont: {
+                                size: 13
+                            },
+                            padding: 10,
+                            cornerRadius: 6,
+                            displayColors: false,
+                            position: 'nearest' // Use 'nearest' or 'average' for better positioning
                         }
                     },
                     scales: {
@@ -1727,6 +1747,20 @@
                             title: {
                                 display: true,
                                 text: 'Values'
+                            },
+                            grid: {
+                                color: `rgba(${brandGrayRGB}, 0.1)` // Reduce gridline transparency
+                            },
+                            ticks: {
+                                color: `rgb(${brandGrayRGB})`
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: `rgba(${brandGrayRGB}, 0.1)` // Reduce gridline transparency
+                            },
+                            ticks: {
+                                color: `rgb(${brandGrayRGB})`
                             }
                         }
                     },
@@ -2022,12 +2056,12 @@
             // instead of target which could be a child element
             const itemDiv = event.currentTarget;
             const catalogNumber = itemDiv.getAttribute('data-catalog-number');
-            
+
             if (!catalogNumber) {
                 console.error('No catalog number found on clicked element');
                 return;
             }
-            
+
             const index = selectedCatalogNumbers.indexOf(catalogNumber);
             const isCtrlPressed = event.ctrlKey || event.metaKey; // metaKey for Mac
 
@@ -2456,6 +2490,10 @@
         }
 
         function updateValidationChart(data) {
+            // Get the computed styles to extract RGB values from CSS variables
+            const computedStyles = getComputedStyle(document.documentElement);
+            const brandGrayRGB = computedStyles.getPropertyValue('--brand-gray-rgb').trim();
+
             const ctx = document.getElementById('validationChart').getContext('2d');
 
             const labels = data.map(d => d.model_type);
@@ -2486,31 +2524,31 @@
                     plugins: {
                         legend: {
                             labels: {
-                                color: 'rgb(var(--brand-gray-rgb))' // Use brand gray for legend text
+                                color: 'rgb(100, 100, 100)' // Use specific color instead of CSS variable
                             }
                         },
                         tooltip: {
-                            titleColor: 'rgb(var(--brand-gray-rgb))', // Use brand gray for tooltip title
-                            bodyColor: 'rgb(var(--brand-gray-rgb))',  // Use brand gray for tooltip body
-                            backgroundColor: 'rgba(var(--brand-gray-rgb), 0.8)' // Use brand gray for tooltip background
+                            titleColor: 'rgb(255, 255, 255)', // White text for better contrast
+                            bodyColor: 'rgb(255, 255, 255)',  // White text for better contrast
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)' // Dark background for better contrast
                         }
                     },
                     scales: {
                         y: {
                             beginAtZero: true,
                             ticks: {
-                                color: 'rgb(var(--brand-gray-rgb))'  // Use brand gray for axis ticks
+                                color: 'rgb(100, 100, 100)'  // Use specific color instead of CSS variable
                             },
                             grid: {
-                                color: 'rgba(var(--brand-gray-rgb), 0.2)'  // Use brand gray for grid lines
+                                color: 'rgba(100, 100, 100, 0.2)'  // Use specific color instead of CSS variable
                             }
                         },
                         x: {
                             ticks: {
-                                color: 'rgb(var(--brand-gray-rgb))'  // Use brand gray for axis ticks
+                                color: 'rgb(100, 100, 100)'  // Use specific color instead of CSS variable
                             },
                             grid: {
-                                color: 'rgba(var(--brand-gray-rgb), 0.2)'  // Use brand gray for grid lines
+                                color: 'rgba(100, 100, 100, 0.2)'  // Use specific color instead of CSS variable
                             }
                         }
                     }
