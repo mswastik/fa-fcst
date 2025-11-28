@@ -1899,12 +1899,12 @@
                 catalogNumberListDiv.innerHTML = '<p>No data loaded.</p>';
                 return;
             }
-            console.log("filtered :", JSON.stringify(filterData[0]))
+            console.log("filtered :", JSON.stringify(filteredData[0]))
 
             // Group filtered data by catalog number and calculate total Act Orders Rev for each
             const catalogTotals = {};
             filteredData.forEach(row => {
-                const catalogNumber = row.CatalogNumber;
+            const catalogNumber = row.CatalogNumber;
                 if (catalogNumber !== undefined && catalogNumber !== null) {
                     const actOrdersRev = row['Act Orders Rev'] || 0;
                     if (!catalogTotals[catalogNumber]) {
@@ -1914,13 +1914,14 @@
                 }
             });
 
-            // Get unique catalog numbers and sort by total Act Orders Rev in descending order
-            // Filter out catalog numbers with zero Act Orders Rev
-            const uniqueCatalogNumbers = Object.keys(catalogTotals)
-                .filter(catalogNumber => catalogTotals[catalogNumber] > 0) // Only include catalogs with non-zero Act Orders Rev
-                .sort((a, b) => {
-                    return catalogTotals[b] - catalogTotals[a]; // Descending order
-                });
+            // 1. Filter out catalog numbers with zero Act Orders Rev
+            const catalogNumbersWithOrders = Object.keys(catalogTotals)
+                .filter(catalogNumber => catalogTotals[catalogNumber] > 0);
+
+            // 2. Sort by total Act Orders Rev in descending order
+            const uniqueCatalogNumbers = catalogNumbersWithOrders.sort((a, b) => {
+                return catalogTotals[b] - catalogTotals[a]; // Descending order
+            });
 
             if (uniqueCatalogNumbers.length === 0) {
                 catalogNumberListDiv.innerHTML = '<p>No Catalog Numbers found.</p>';
@@ -1950,7 +1951,6 @@
 
                 // Copy button
                 const copyButton = document.createElement('button');
-                //copyButton.innerHTML = '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAACS0lEQVR4nO2by07bQBSGP1uRaOEByGvAS7RVuWxBJTwDTUjZZsmG6wYBopuqVBWv0TXqrlIvrKDtiiKVfdBIE+lo5OA4mBkzPr90Vs54jr/x+cexjqFcpUAL2PAYb4E3wCyQEFirQD9gXAE7wHQoAK3AAAbxH1gPcUekwAqw6TG2gU/AnwwQp8AzaqIUeAGcZ0AI7g0+1QB2HQgdaqg9xxOa1EwNpxyMVzxIU8Ai0Pa8z7cfsM+/FAAux/WCBOgCNxXY3n7bfb5ZwBj/ivEGYiGl1kX7FYtb4N2IK/pZjFsqCqDrTPwTOPS0v38R8363q++COAMmc65hS/zelFOhmr8Rg4+BCfypJ+bu2bvxFfA1A0JS4Dwja0EM/OH54u9L3Lj7vgOhO8Z5crUuBh7gX3mJ7zue0CwbQG/cgSWpI+Y3vuOq4ZTDdmwA5h3zzSrB1yPs808WwCTwT+RwkgEhdf4FzsQEwC0DE79sOcgnxW/i+DKRAUiAjwUekDqxARhAaDvlMCzMy5joAEhPmLcvQbOeHFesJ0QLYFwpABQAUQNI7ev4Vl09YFXkaSDUDkAvJ08FgAJAAaAAUAAoABQAJZ64KlIAKAAUAAoABYACQAFQ/PhQKQAUAAoABYACQAGgAKiuFAAKAAWAAmBYnq2cDpLoAQy+YxrWQRI9gEfr1KyKjkSepn/Ia6dmaJlP4i5EnqZz1GunZuiLfy/yuwaeh+jU3AgQR87Km1ijAp2a/UDx4TE/jkwKdGr6jmu78kkVOjU3PYbJYa6Mmr8DEqg01a9iFYQAAAAASUVORK5CYII=" alt="copy--v1">'; // Clipboard emoji as copy icon
                 copyButton.innerHTML = '&#128203;'; // Clipboard emoji
                 copyButton.title = 'Copy catalog number';
                 copyButton.style.background = 'none';
@@ -2018,7 +2018,16 @@
         }
 
         function handleCatalogNumberClick(event) {
-            const catalogNumber = event.target.getAttribute('data-catalog-number');
+            // Use currentTarget to get the element with the event listener (itemDiv)
+            // instead of target which could be a child element
+            const itemDiv = event.currentTarget;
+            const catalogNumber = itemDiv.getAttribute('data-catalog-number');
+            
+            if (!catalogNumber) {
+                console.error('No catalog number found on clicked element');
+                return;
+            }
+            
             const index = selectedCatalogNumbers.indexOf(catalogNumber);
             const isCtrlPressed = event.ctrlKey || event.metaKey; // metaKey for Mac
 
@@ -2026,7 +2035,7 @@
             if (!isCtrlPressed) {
                 // Clear all selections except the one being clicked
                 document.querySelectorAll('#catalog-number-list div.selected').forEach(item => {
-                    if (item !== event.target) {
+                    if (item !== itemDiv) {
                         item.classList.remove('selected');
                     }
                 });
@@ -2036,12 +2045,12 @@
             // Toggle the clicked item
             if (index === -1) {
                 selectedCatalogNumbers.push(catalogNumber);
-                event.target.classList.add('selected');
+                itemDiv.classList.add('selected');
             } else {
                 // Only allow deselection if Ctrl/Cmd is pressed or if it's the only selected item
                 if (isCtrlPressed || selectedCatalogNumbers.length === 1) {
                     selectedCatalogNumbers.splice(index, 1);
-                    event.target.classList.remove('selected');
+                    itemDiv.classList.remove('selected');
                 }
             }
 
