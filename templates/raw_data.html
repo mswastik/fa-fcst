@@ -39,8 +39,9 @@
                 {% if location_options %}
                 {% include 'partials/raw_data_location_select2.html' %}
                 {% else %}
-                <label class="block text-sm font-medium text-gray-700" id="location2-label">{{
-                    initial_location_options[0] }}</label>
+                <label class="block text-sm font-medium text-gray-700" id="location2-label">{{ 
+                    initial_location_options[0] }}
+                </label>
                 <select name="location2"
                     class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
                     hx-post="/api/raw_data/pivot"
@@ -74,8 +75,8 @@
                 {% if product_options %}
                 {% include 'partials/raw_data_product_select2.html' %}
                 {% else %}
-                <label class="block text-sm font-medium text-gray-700" id="product2-label">{{ initial_product_options[0]
-                    }}</label>
+                <label class="block text-sm font-medium text-gray-700" id="product2-label">{{ initial_product_options[0] }}
+                    </label>
                 <select name="product2"
                     class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 tom-select"
                     hx-post="/api/raw_data/pivot"
@@ -112,19 +113,16 @@
             <select class="field-list field-select" data-zone="columns" id="column-fields" multiple></select>
         </div>
 
+
         <div class="field-group">
-            <h4>Values</h4>
-            <select class="field-list field-select" data-zone="values" id="value-fields" multiple></select>
-        </div>
-        <div class="field-group">
-            <h4>Line Chart Fields</h4>
-            <select class="field-list" id="line-chart-fields" multiple>
+            <h4>Value Fields</h4>
+            <h2>Line Fields</h3>
+            <select class="field-list field-select" id="line-chart-fields" multiple>
                 <option value="">Select fields for line chart...</option>
             </select>
-        </div>
-        <div class="field-group">
-            <h4>Bar Chart Fields</h4>
-            <select class="field-list" id="bar-chart-fields" multiple>
+
+            <h2>Bar Fields</h2>
+            <select class="field-list field-select" id="bar-chart-fields" multiple>
                 <option value="">Select fields for bar chart...</option>
             </select>
         </div>
@@ -447,14 +445,18 @@
 
             // Apply default selections if none are made
             const rowFieldsSelect = document.getElementById('row-fields');
-            const valueFieldsSelect = document.getElementById('value-fields');
+            const lineChartFieldsSelect = document.getElementById('line-chart-fields');
+            const barChartFieldsSelect = document.getElementById('bar-chart-fields');
+
 
             // Check if already selected before setting defaults
             let hasRowSelection = Array.from(rowFieldsSelect.selectedOptions).length > 0;
-            let hasValueSelection = Array.from(valueFieldsSelect.selectedOptions).length > 0;
+            let hasLineSelection = lineChartFieldsSelect ? Array.from(lineChartFieldsSelect.selectedOptions).length > 0 : true;
+            let hasBarSelection = barChartFieldsSelect ? Array.from(barChartFieldsSelect.selectedOptions).length > 0 : true;
+
 
             if (!hasRowSelection) {
-                const defaultRowField = 'SALES_DATE';  // Changed from 'sales_date' to match actual field name
+                const defaultRowField = 'SALES_DATE';
                 const rowOption = Array.from(rowFieldsSelect.options).find(opt => opt.value === defaultRowField);
                 if (rowOption) {
                     rowOption.selected = true;
@@ -464,32 +466,32 @@
                 }
             }
 
-            if (!hasValueSelection) {
-                // Auto-select Act Orders Rev
+            if (lineChartFieldsSelect && !hasLineSelection) {
                 const defaultValueField = 'Act Orders Rev';
-                const valueOption = Array.from(valueFieldsSelect.options).find(opt => opt.value === defaultValueField);
+                const valueOption = Array.from(lineChartFieldsSelect.options).find(opt => opt.value === defaultValueField);
                 if (valueOption) {
                     valueOption.selected = true;
-                    console.log("Default value field 'Act Orders Rev' selected.");
+                    console.log("Default line chart field 'Act Orders Rev' selected.");
                 } else {
-                    console.log("Default value field 'Act Orders Rev' not found.");
+                    console.log("Default line chart field 'Act Orders Rev' not found.");
                 }
+            }
 
-                // Auto-select xgb, AutoARIMA, and MSTL forecast models
+            if (barChartFieldsSelect && !hasBarSelection) {
                 const forecastModels = ['xgb', 'Ensemble', 'MSTL','Fcst Stat Prelim Rev'];
                 forecastModels.forEach(model => {
-                    const modelOption = Array.from(valueFieldsSelect.options).find(opt => opt.value === model);
+                    const modelOption = Array.from(barChartFieldsSelect.options).find(opt => opt.value === model);
                     if (modelOption) {
                         modelOption.selected = true;
-                        console.log(`Default forecast model '${model}' selected.`);
+                        console.log(`Default bar chart model '${model}' selected.`);
                     } else {
-                        console.log(`Default forecast model '${model}' not found.`);
+                        console.log(`Default bar chart model '${model}' not found.`);
                     }
                 });
             }
 
             // Update custom displays
-            [rowFieldsSelect, valueFieldsSelect].forEach(s => {
+            [rowFieldsSelect, lineChartFieldsSelect, barChartFieldsSelect].forEach(s => {
                 if (s && s.tomselect) {
                     s.tomselect.sync();
                 }
@@ -510,12 +512,15 @@
             // Get selected fields
             const rowFields = getSelectedFields('row-fields');
             const columnFields = getSelectedFields('column-fields');
-            const valueFields = getSelectedFields('value-fields');
+            const lineChartFields = getSelectedFields('line-chart-fields') || [];
+            const barChartFields = getSelectedFields('bar-chart-fields') || [];
+            const valueFields = [...new Set([...lineChartFields, ...barChartFields])];
+
 
             console.log("Selected fields for pivot:", { rows: rowFields, columns: columnFields, values: valueFields });
 
             // Generate pivot table
-            pivotData = createPivotTable(filteredData, rowFields, columnFields, valueFields);
+            pivotData = createPivotTable(filteredData, rowFields, columnFields, valueFields.map(f => ({field: f, aggregation: 'sum'})));
 
             // Render pivot table
             renderPivotTable(pivotData);
@@ -530,24 +535,22 @@
         }
 
         // Function to get selected fields from a select element
-
         function getSelectedFields(selectId) {
+            const selectElement = document.getElementById(selectId);
+            if (!selectElement) return [];
 
-            const select = document.getElementById(selectId);
-
-            if (!select) return [];
-
-
-
-            const selectedOptions = Array.from(select.selectedOptions);
-
+            // Prefer TomSelect API if available, as it's more reliable than selectedOptions
+            if (selectElement.tomselect) {
+                const values = selectElement.tomselect.getValue();
+                // TomSelect's getValue() returns an array for multi-selects 
+                // and a string for single-selects.
+                return Array.isArray(values) ? values : (values ? [values] : []);
+            }
+            
+            // Fallback to standard DOM properties for elements without TomSelect
+            const selectedOptions = Array.from(selectElement.selectedOptions);
             return selectedOptions.map(option => option.value);
-
         }
-
-
-
-
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function () {
@@ -574,8 +577,8 @@
 
         // Function to initialize TomSelect specifically for the field selection areas
         function initializeFieldSelectors() {
-            // Initialize the field selector elements (these are the ones that were previously using convertMultiSelectToAutocomplete)
-            const fieldSelectorIds = ['row-fields', 'column-fields', 'value-fields'];
+            // Initialize the field selector elements
+            const fieldSelectorIds = ['row-fields', 'column-fields', 'line-chart-fields', 'bar-chart-fields'];
             fieldSelectorIds.forEach(function (id) {
                 const selectElement = document.getElementById(id);
                 if (selectElement && selectElement.classList.contains('field-select')) {
@@ -618,35 +621,6 @@
                                 if (typeof generatePivot === 'function') {
                                     generatePivot();
                                 }
-                            },
-                            onInitialize: function () {
-                                // Set default selections after TomSelect is initialized
-                                setTimeout(function () {
-                                    if (id === 'row-fields') {
-                                        const defaultRowField = 'SALES_DATE';
-                                        if (selectElement.options.namedItem(defaultRowField) && !selectElement.tomselect.getValue().includes(defaultRowField)) {
-                                            selectElement.tomselect.addItem(defaultRowField);
-                                        }
-                                    } else if (id === 'value-fields') {
-                                        const defaultValueField = 'Act Orders Rev';
-
-                                        // Check and add Act Orders Rev if available
-                                        if (selectElement.options.namedItem(defaultValueField) && !selectElement.tomselect.getValue().includes(defaultValueField)) {
-                                            selectElement.tomselect.addItem(defaultValueField);
-                                        }
-
-                                        // Look for and add any forecast-related fields that might be available
-                                        const options = selectElement.options;
-                                        for (let i = 0; i < options.length; i++) {
-                                            const optionValue = options[i].value;
-                                            // Check for forecast fields that contain common forecast model names
-                                            if ((optionValue.includes('NHITS') || optionValue.includes('forecast') || optionValue.includes('Forecast'))
-                                                && !selectElement.tomselect.getValue().includes(optionValue)) {
-                                                selectElement.tomselect.addItem(optionValue);
-                                            }
-                                        }
-                                    }
-                                }, 10); // Small delay to ensure TomSelect is fully initialized
                             }
                         };
 
@@ -659,7 +633,7 @@
         // Function to initialize TomSelect for regular filter dropdowns (location and product filters)
         function initializeTomSelects() {
             // Select all elements with tom-select class that haven't been initialized yet (excluding field selectors)
-            const selectElements = document.querySelectorAll('.tom-select:not(.ts-wrapper):not(#row-fields):not(#column-fields):not(#value-fields)');
+            const selectElements = document.querySelectorAll('.tom-select:not(.ts-wrapper):not(#row-fields):not(#column-fields):not(#line-chart-fields):not(#bar-chart-fields)');
             selectElements.forEach(function (selectElement) {
                 // Skip if it's already been initialized
                 if (selectElement.tomselect) return;
@@ -716,7 +690,7 @@
                 const fields = Object.keys(currentData[0]);
 
                 // Update the field selectors (row-fields, column-fields, value-fields)
-                const fieldSelectorIds = ['row-fields', 'column-fields', 'value-fields'];
+                const fieldSelectorIds = ['row-fields', 'column-fields', 'line-chart-fields', 'bar-chart-fields', 'facet-field'];
                 fieldSelectorIds.forEach(function (id) {
                     const selectElement = document.getElementById(id);
 
@@ -794,33 +768,6 @@
                                             }
                                         });
                                     }
-
-                                    // Always ensure default values are selected regardless of previous selections
-                                    // But only if they exist in the current field list
-                                    if (id === 'row-fields') {
-                                        const defaultRowField = 'SALES_DATE';
-                                        if (Array.from(selectElement.options).some(opt => opt.value === defaultRowField) &&
-                                            tsInstance && !tsInstance.getValue().includes(defaultRowField)) {
-                                            tsInstance.addItem(defaultRowField);
-                                        }
-                                    } else if (id === 'value-fields') {
-                                        const defaultValueField = 'Act Orders Rev';
-                                        const forecastModels = ['xgb', 'AutoARIMA', 'MSTL'];
-
-                                        // Add Act Orders Rev if available and not already selected
-                                        if (Array.from(selectElement.options).some(opt => opt.value === defaultValueField) &&
-                                            tsInstance && !tsInstance.getValue().includes(defaultValueField)) {
-                                            tsInstance.addItem(defaultValueField);
-                                        }
-
-                                        // Auto-select xgb, AutoARIMA, and MSTL forecast models
-                                        forecastModels.forEach(model => {
-                                            if (Array.from(selectElement.options).some(opt => opt.value === model) &&
-                                                tsInstance && !tsInstance.getValue().includes(model)) {
-                                                tsInstance.addItem(model);
-                                            }
-                                        });
-                                    }
                                 }
                             };
 
@@ -890,7 +837,7 @@
         }
 
         function updateAvailableFields() {
-            if (currentData.length === 0) return;
+            if (!currentData || currentData.length === 0) return;
 
             const fields = Object.keys(currentData[0]);
             const fieldSelects = document.querySelectorAll('.field-select');
@@ -1351,7 +1298,11 @@
         function generatePivot() {
             const rowFields = getFieldsFromZone('rows');
             const columnFields = getFieldsFromZone('columns');
-            const valueFields = getFieldsFromZone('values');
+            const lineChartFields = getSelectedFields('line-chart-fields') || [];
+            const barChartFields = getSelectedFields('bar-chart-fields') || [];
+            const chartValueFields = [...new Set([...lineChartFields, ...barChartFields])];
+            const valueFields = chartValueFields.map(field => ({ field, aggregation: 'sum' }));
+
 
             // Add null check for currentData
             if (!currentData || !Array.isArray(currentData)) {
@@ -1371,21 +1322,23 @@
         }
 
         function getFieldsFromZone(zone) {
-            const zoneElement = document.getElementById(`${zone === 'rows' ? 'row' : zone === 'columns' ? 'column' : 'value'}-fields`);
-            const fields = [];
-
-            if (zoneElement && zoneElement.tagName === 'SELECT') {
-                Array.from(zoneElement.selectedOptions).forEach(option => {
-                    const field = option.value;
-                    if (zone === 'values') {
-                        // Default to 'sum' for value fields, as there's no individual aggregation selector
-                        fields.push({ field, aggregation: 'sum' });
-                    } else {
-                        fields.push(field);
-                    }
-                });
+            const zoneElement = document.getElementById(`${zone === 'rows' ? 'row' : zone}-fields`);
+            
+            // Prefer TomSelect API if available, as it's more reliable than selectedOptions
+            if (zoneElement && zoneElement.tomselect) {
+                const values = zoneElement.tomselect.getValue();
+                // TomSelect's getValue() returns an array for multi-selects 
+                // and a string for single-selects.
+                return Array.isArray(values) ? values : (values ? [values] : []);
             }
 
+            // Fallback to standard DOM properties for elements without TomSelect
+            const fields = [];
+            if (zoneElement && zoneElement.tagName === 'SELECT') {
+                Array.from(zoneElement.selectedOptions).forEach(option => {
+                    fields.push(option.value);
+                });
+            }
             return fields;
         }
 
@@ -1714,10 +1667,14 @@
 
                     // Only create chart if there's data for this facet value
                     if (facetData.length > 0) {
+                        const lineChartFields = getSelectedFields('line-chart-fields') || [];
+                        const barChartFields = getSelectedFields('bar-chart-fields') || [];
+                        const valueFields = [...new Set([...lineChartFields, ...barChartFields])].map(field => ({ field, aggregation: 'sum' }));
+
                         const pivotData = createPivotTable(facetData,
                             getFieldsFromZone('rows'),
                             getFieldsFromZone('columns'),
-                            getFieldsFromZone('values'));
+                            valueFields);
 
                         const chartDiv = document.createElement('div');
                         chartDiv.className = 'facet-chart';
@@ -1765,7 +1722,11 @@
                     },
                     scales: {
                         y: {
-                            beginAtZero: true
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Values'
+                            }
                         }
                     },
                     pointRadius: 1,
@@ -1776,53 +1737,45 @@
         function prepareChartData(pivotData) {
             if (!pivotData) return { labels: [], datasets: [] };
 
+            const rowFields = getFieldsFromZone('rows');
             const columnFields = getFieldsFromZone('columns');
-            const valueFields = getFieldsFromZone('values');
-
-            // Get chart type selections from the new select elements
             const lineChartFields = getSelectedFields('line-chart-fields') || [];
             const barChartFields = getSelectedFields('bar-chart-fields') || [];
+            const valueFields = [...new Set([...lineChartFields, ...barChartFields])].map(field => ({ field, aggregation: 'sum' }));
 
-            // Sort labels chronologically if they're dates, otherwise keep original sorting
             const rawLabels = pivotData.rowKeys;
-            const sortedLabels = [...rawLabels].sort((a, b) => {
+            const sortedLabelsAndData = [...rawLabels].sort((a, b) => {
                 const dateA = new Date(a);
                 const dateB = new Date(b);
                 if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
-                    // If not dates, sort as strings
                     return String(a).localeCompare(String(b));
                 }
-                // Sort dates chronologically
                 return dateA - dateB;
             });
 
-            const labels = sortedLabels.map(label => {
+            const labels = sortedLabelsAndData.map(label => {
                 const date = new Date(label);
                 if (!isNaN(date.getTime())) {
-                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                     return months[date.getMonth()] + '-' + date.getFullYear().toString().substr(-2);
                 }
-                return label; // Return original label if not a valid date
+                return label;
             });
+
             const datasets = [];
 
             if (columnFields.length === 0) {
                 valueFields.forEach((vf, index) => {
                     const key = `${vf.field}_${vf.aggregation}`;
-                    const data = pivotData.rowKeys.map(rowKey => {
+                    const data = sortedLabelsAndData.map(rowKey => {
                         return pivotData.data[rowKey]['Total']?.[key] || 0;
                     });
 
-                    // Determine if this field should be a line or bar chart based on user selection
-                    let chartType = 'line'; // Default to line
-                    if (barChartFields.includes(vf.field)) {
-                        chartType = 'bar';
-                    } else if (lineChartFields.includes(vf.field)) {
+                    let chartType = 'bar';
+                    if (lineChartFields.includes(vf.field)) {
                         chartType = 'line';
                     }
 
-                    // For forecast fields, use a more descriptive label
                     let label = `${vf.field} (${vf.aggregation})`;
                     if (vf.field.startsWith('forecast_')) {
                         const modelName = vf.field.replace('forecast_', '');
@@ -1835,21 +1788,21 @@
                             data: data,
                             type: 'line',
                             fill: false,
-                            borderColor: generateColors(pivotData.rowKeys.length, index, 1),
-                            backgroundColor: generateColors(pivotData.rowKeys.length, index, 0.2),
+                            borderColor: generateColors(labels.length, index, 1),
+                            backgroundColor: generateColors(labels.length, index, 0.2),
                             borderWidth: 2,
-                            tension: 0.1, // Smooth the line slightly
-                            yAxisID: 'y-axis-1'
+                            tension: 0.1,
+                            yAxisID: 'y'
                         });
-                    } else { // bar chart
+                    } else {
                         datasets.push({
                             label: label,
                             data: data,
                             type: 'bar',
-                            backgroundColor: generateColors(pivotData.rowKeys.length, index, 0.7),
-                            borderColor: generateColors(pivotData.rowKeys.length, index, 1),
+                            backgroundColor: generateColors(labels.length, index, 0.7),
+                            borderColor: generateColors(labels.length, index, 1),
                             borderWidth: 1,
-                            yAxisID: 'y-axis-1'
+                            yAxisID: 'y'
                         });
                     }
                 });
@@ -1857,19 +1810,15 @@
                 pivotData.columnValues.forEach((colValue, colIndex) => {
                     valueFields.forEach((vf, valIndex) => {
                         const key = `${vf.field}_${vf.aggregation}`;
-                        const data = pivotData.rowKeys.map(rowKey => {
+                        const data = sortedLabelsAndData.map(rowKey => {
                             return pivotData.data[rowKey]?.[colValue]?.[key] || 0;
                         });
 
-                        // Determine if this field should be a line or bar chart based on user selection
-                        let chartType = 'line'; // Default to line
-                        if (barChartFields.includes(vf.field)) {
-                            chartType = 'bar';
-                        } else if (lineChartFields.includes(vf.field)) {
+                        let chartType = 'bar';
+                        if (lineChartFields.includes(vf.field)) {
                             chartType = 'line';
                         }
 
-                        // For forecast fields, use a more descriptive label
                         let label = `${colValue} - ${vf.field} (${vf.aggregation})`;
                         if (vf.field.startsWith('forecast_')) {
                             const modelName = vf.field.replace('forecast_', '');
@@ -1885,10 +1834,10 @@
                                 borderColor: generateColors(pivotData.columnValues.length * valueFields.length, colIndex * valueFields.length + valIndex, 1),
                                 backgroundColor: generateColors(pivotData.columnValues.length * valueFields.length, colIndex * valueFields.length + valIndex, 0.2),
                                 borderWidth: 2,
-                                tension: 0.1, // Smooth the line slightly
-                                yAxisID: 'y-axis-1'
+                                tension: 0.1,
+                                yAxisID: 'y'
                             });
-                        } else { // bar chart
+                        } else {
                             datasets.push({
                                 label: label,
                                 data: data,
@@ -1896,7 +1845,7 @@
                                 backgroundColor: generateColors(pivotData.columnValues.length * valueFields.length, colIndex * valueFields.length + valIndex, 0.7),
                                 borderColor: generateColors(pivotData.columnValues.length * valueFields.length, colIndex * valueFields.length + valIndex, 1),
                                 borderWidth: 1,
-                                yAxisID: 'y-axis-1'
+                                yAxisID: 'y'
                             });
                         }
                     });
@@ -2034,7 +1983,7 @@
         }
 
         function clearAll() {
-            const zones = ['row-fields', 'column-fields', 'value-fields'];
+            const zones = ['row-fields', 'column-fields', 'line-chart-fields', 'bar-chart-fields'];
 
             zones.forEach(zoneId => {
                 const selectElement = document.getElementById(zoneId);
@@ -2084,7 +2033,9 @@
 
             const rowFields = getFieldsFromZone('rows');
             const columnFields = getFieldsFromZone('columns');
-            const valueFields = getFieldsFromZone('values');
+            const lineChartFields = getSelectedFields('line-chart-fields') || [];
+            const barChartFields = getSelectedFields('bar-chart-fields') || [];
+            const valueFields = [...new Set([...lineChartFields, ...barChartFields])].map(field => ({ field, aggregation: 'sum' }));
 
             let csvContent = '';
 
@@ -2394,9 +2345,10 @@
                             <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatValue(row.mae)}</td>
                             <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${row.mape}%</td>
                             <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatValue(row.rmse)}</td>
-                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${row.accuracy_percentage}%</td>
-                        </tr>
-                    `;
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${row.accuracy_percentage}%
+                                    </td>
+                                </tr>
+                            `;
             });
 
             tableBody.innerHTML = html;
