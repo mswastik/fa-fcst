@@ -185,9 +185,8 @@
                 style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <div>
                     <label for="chart-limit">Max Charts: </label>
-                    <input type="number" id="chart-limit" min="1" max="50" value="10" style="width: 60px;">
+                    <input type="number" id="chart-limit" min="1" max="50" value="20" style="width: 60px;">
                 </div>
-                <button class="btn small" onclick="updateChart()">Update Charts</button>
             </div>
             <div id="chart-container" class="chart-container"
                 style="display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 10px;">
@@ -1324,7 +1323,7 @@
         }
 
         function getFieldsFromZone(zone) {
-            const zoneElement = document.getElementById(`${zone === 'rows' ? 'row' : zone}-fields`);
+            const zoneElement = document.getElementById(`${zone === 'rows' ? 'row': zone==='columns' ? 'column' : zone}-fields`);
 
             // Prefer TomSelect API if available, as it's more reliable than selectedOptions
             if (zoneElement && zoneElement.tomselect) {
@@ -1916,9 +1915,12 @@
             });
 
             // Get unique catalog numbers and sort by total Act Orders Rev in descending order
-            const uniqueCatalogNumbers = Object.keys(catalogTotals).sort((a, b) => {
-                return catalogTotals[b] - catalogTotals[a]; // Descending order
-            });
+            // Filter out catalog numbers with zero Act Orders Rev
+            const uniqueCatalogNumbers = Object.keys(catalogTotals)
+                .filter(catalogNumber => catalogTotals[catalogNumber] > 0) // Only include catalogs with non-zero Act Orders Rev
+                .sort((a, b) => {
+                    return catalogTotals[b] - catalogTotals[a]; // Descending order
+                });
 
             if (uniqueCatalogNumbers.length === 0) {
                 catalogNumberListDiv.innerHTML = '<p>No Catalog Numbers found.</p>';
@@ -1927,14 +1929,92 @@
 
             uniqueCatalogNumbers.forEach(catalogNumber => {
                 const itemDiv = document.createElement('div');
-                itemDiv.textContent = catalogNumber;
                 itemDiv.setAttribute('data-catalog-number', catalogNumber);
+                itemDiv.classList.add('catalog-number-item'); // Add a class for styling
+
+                // Create a container for the catalog number and copy button
+                const containerDiv = document.createElement('div');
+                containerDiv.style.display = 'flex';
+                //containerDiv.style.justifyContent = 'space-between';
+                containerDiv.style.alignItems = 'left';
+                containerDiv.style.padding = '1px 1px';
+                containerDiv.style.border = 'none';
+                containerDiv.style.borderRadius = '5px';
+                containerDiv.style.transition = 'all 0.3s';
+
+                // Catalog number text
+                const catalogNumberSpan = document.createElement('span');
+                catalogNumberSpan.textContent = catalogNumber;
+                catalogNumberSpan.style.flex = '1';
+                containerDiv.appendChild(catalogNumberSpan);
+
+                // Copy button
+                const copyButton = document.createElement('button');
+                //copyButton.innerHTML = '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAACS0lEQVR4nO2by07bQBSGP1uRaOEByGvAS7RVuWxBJTwDTUjZZsmG6wYBopuqVBWv0TXqrlIvrKDtiiKVfdBIE+lo5OA4mBkzPr90Vs54jr/x+cexjqFcpUAL2PAYb4E3wCyQEFirQD9gXAE7wHQoAK3AAAbxH1gPcUekwAqw6TG2gU/AnwwQp8AzaqIUeAGcZ0AI7g0+1QB2HQgdaqg9xxOa1EwNpxyMVzxIU8Ai0Pa8z7cfsM+/FAAux/WCBOgCNxXY3n7bfb5ZwBj/ivEGYiGl1kX7FYtb4N2IK/pZjFsqCqDrTPwTOPS0v38R8363q++COAMmc65hS/zelFOhmr8Rg4+BCfypJ+bu2bvxFfA1A0JS4Dwja0EM/OH54u9L3Lj7vgOhO8Z5crUuBh7gX3mJ7zue0CwbQG/cgSWpI+Y3vuOq4ZTDdmwA5h3zzSrB1yPs808WwCTwT+RwkgEhdf4FzsQEwC0DE79sOcgnxW/i+DKRAUiAjwUekDqxARhAaDvlMCzMy5joAEhPmLcvQbOeHFesJ0QLYFwpABQAUQNI7ev4Vl09YFXkaSDUDkAvJ08FgAJAAaAAUAAoABQAJZ64KlIAKAAUAAoABYACQAFQ/PhQKQAUAAoABYACQAGgAKiuFAAKAAWAAmBYnq2cDpLoAQy+YxrWQRI9gEfr1KyKjkSepn/Ia6dmaJlP4i5EnqZz1GunZuiLfy/yuwaeh+jU3AgQR87Km1ijAp2a/UDx4TE/jkwKdGr6jmu78kkVOjU3PYbJYa6Mmr8DEqg01a9iFYQAAAAASUVORK5CYII=" alt="copy--v1">'; // Clipboard emoji as copy icon
+                copyButton.innerHTML = '&#128203;'; // Clipboard emoji
+                copyButton.title = 'Copy catalog number';
+                copyButton.style.background = 'none';
+                copyButton.style.border = 'none';
+                copyButton.style.fontSize = '12px';
+                copyButton.style.cursor = 'pointer';
+                copyButton.style.padding = '1px 1px';
+                copyButton.style.opacity = '0'; // Initially hidden
+                copyButton.style.marginLeft = '5px';
+                copyButton.onclick = function(e) {
+                    e.stopPropagation(); // Prevent selection toggle
+                    copyCatalogNumber(catalogNumber);
+                };
+
+                containerDiv.appendChild(copyButton);
+
+                // Show/hide copy button on hover
+                itemDiv.addEventListener('mouseenter', function() {
+                    copyButton.style.opacity = '1';
+                });
+
+                itemDiv.addEventListener('mouseleave', function() {
+                    copyButton.style.opacity = '0';
+                });
+
+                itemDiv.appendChild(containerDiv);
+
                 if (selectedCatalogNumbers.includes(catalogNumber)) {
                     itemDiv.classList.add('selected');
                 }
+
                 itemDiv.addEventListener('click', handleCatalogNumberClick);
                 catalogNumberListDiv.appendChild(itemDiv);
             });
+        }
+
+        // Function to copy a catalog number to clipboard
+        function copyCatalogNumber(catalogNumber) {
+            navigator.clipboard.writeText(catalogNumber).then(function() {
+                // Show temporary feedback
+                showCopyFeedback(catalogNumber);
+            }).catch(function(err) {
+                console.error('Could not copy catalog number: ', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = catalogNumber;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showCopyFeedback(catalogNumber);
+            });
+        }
+
+        // Function to show temporary feedback when catalog number is copied
+        function showCopyFeedback(catalogNumber) {
+            const catalogElement = document.querySelector(`[data-catalog-number="${catalogNumber}"]`);
+            if (catalogElement) {
+                catalogElement.style.background = 'lightgray';
+
+                setTimeout(function() {
+                    catalogElement.style.background = 'none';
+                }, 1000);
+            }
         }
 
         function handleCatalogNumberClick(event) {

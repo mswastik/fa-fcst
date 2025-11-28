@@ -432,17 +432,17 @@ class DatabaseService:
 
                 # Get product options with LIMIT to prevent memory issues
                 product_queries = [
-                    ("SELECT DISTINCT franchise FROM da.product_hierarchy WHERE franchise IS NOT NULL ORDER BY franchise LIMIT 1000", 'franchises'),
-                    ("SELECT DISTINCT ibp_level_5 FROM da.product_hierarchy WHERE ibp_level_5 IS NOT NULL ORDER BY ibp_level_5 LIMIT 2000", 'ibp_level_5s'),
-                    ("SELECT DISTINCT ibp_level_6 FROM da.product_hierarchy WHERE ibp_level_6 IS NOT NULL ORDER BY ibp_level_6 LIMIT 2000", 'ibp_level_6s'),
+                    ("SELECT DISTINCT franchise FROM da.product_hierarchy WHERE franchise IS NOT NULL ORDER BY franchise LIMIT 10", 'franchises'),
+                    ("SELECT DISTINCT ibp_level_5 FROM da.product_hierarchy WHERE ibp_level_5 IS NOT NULL ORDER BY ibp_level_5 LIMIT 8000", 'ibp_level_5s'),
+                    ("SELECT DISTINCT ibp_level_6 FROM da.product_hierarchy WHERE ibp_level_6 IS NOT NULL ORDER BY ibp_level_6 LIMIT 8000", 'ibp_level_6s'),
                     ("SELECT DISTINCT catalog_number FROM da.product_hierarchy WHERE catalog_number IS NOT NULL ORDER BY catalog_number LIMIT 22000", 'catalog_numbers')
                 ]
 
                 # Get location options with LIMIT
                 location_queries = [
-                    ("SELECT DISTINCT region FROM da.location_hierarchy WHERE region IS NOT NULL ORDER BY region LIMIT 1000", 'regions'),
-                    ("SELECT DISTINCT country FROM da.location_hierarchy WHERE country IS NOT NULL ORDER BY country LIMIT 1000", 'countries'),
-                    ("SELECT DISTINCT area FROM da.location_hierarchy WHERE area IS NOT NULL ORDER BY area LIMIT 1000", 'areas')
+                    ("SELECT DISTINCT region FROM da.location_hierarchy WHERE region IS NOT NULL ORDER BY region LIMIT 100", 'regions'),
+                    ("SELECT DISTINCT country FROM da.location_hierarchy WHERE country IS NOT NULL ORDER BY country LIMIT 500", 'countries'),
+                    ("SELECT DISTINCT area FROM da.location_hierarchy WHERE area IS NOT NULL ORDER BY area LIMIT 100", 'areas')
                 ]
 
                 logger.debug("Executing optimized filter options queries with limits")
