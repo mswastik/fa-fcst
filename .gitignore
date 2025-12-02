@@ -1,4 +1,5 @@
 fcst.duckdb
+fcst.duckdb.wal
 */__pycache__
 */*/__pycache__
 __pycache__/
