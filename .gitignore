@@ -1,5 +1,6 @@
 fcst.duckdb
 fcst.duckdb.wal
+fcst - Copy.duckdb
 */__pycache__
 */*/__pycache__
 __pycache__/
