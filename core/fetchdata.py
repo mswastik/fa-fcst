@@ -34,7 +34,6 @@ def _load_credentials():
     # Load credentials from file
     with open(credentials_file, 'r') as f:
         _credentials = json.load(f)
-
     return _credentials
 
 def _get_database_config():
@@ -43,16 +42,17 @@ def _get_database_config():
     Returns a dictionary with server, database_name, username, and password.
     """
     credentials = _load_credentials()
-    return credentials.get("database", {})
+    return credentials #.get("database", {})
 
 def _get_database_connection_params():
     """
     Get database connection parameters.
     Returns server, database, username, and password as a tuple.
     """
-    db_config = _get_database_config()
+    #db_config = _get_database_config()
+    db_config = _load_credentials()
     server = db_config.get("server")
-    database = db_config.get("database_name")
+    database = db_config.get("database")
     username = db_config.get("username")
     password = db_config.get("password")
     return server, database, username, password
@@ -129,6 +129,19 @@ def fetch_and_save_sales_actuals(user_id: str = "system", incremental: bool = Fa
 
     # Handle deletion before inserting new data
     try:
+        # Check if table exists first
+        table_exists = conn.execute("""
+            SELECT COUNT(*) > 0 
+            FROM information_schema.tables 
+            WHERE table_schema = 'da' AND table_name = 'sales_actuals'
+        """).fetchone()[0]
+        
+        if not table_exists:
+            print("Table da.sales_actuals does not exist, creating it...")
+            from core.database_migrations import initialize_database_schema
+            initialize_database_schema()
+            print("Table da.sales_actuals created successfully.")
+        
         if incremental:
             # For incremental updates, delete only the overlapping period
             conn.execute(f"""
